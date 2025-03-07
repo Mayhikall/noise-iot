@@ -1,3 +1,4 @@
+import React from "react";
 import { Calendar, Clock } from "lucide-react";
 
 const DateTimeDisplay = ({ formattedDate, formattedTime }) => {
@@ -11,7 +12,7 @@ const DateTimeDisplay = ({ formattedDate, formattedTime }) => {
         </div>
       </div>
       <div className="flex flex-col items-end">
-        <span className="text-1xs text-green-300 font-medium animate-pulse">LIVE</span>
+        <span className="text-xs text-green-300 font-medium animate-pulse">LIVE</span>
         <div className="flex items-center mt-1">
           <Clock size={16} className="mr-2 text-blue-300" />
           <span className="text-sm font-medium">{formattedTime} WIB</span>

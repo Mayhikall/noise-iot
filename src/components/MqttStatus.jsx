@@ -2,16 +2,15 @@ import { Wifi, WifiOff } from "lucide-react";
 
 const MqttStatus = ({ mqttStatus, toggleMqttStatus }) => {
   return (
-    <div
-      onClick={toggleMqttStatus}
-      className="cursor-pointer flex items-center space-x-2 bg-gray-700 px-3 py-2 rounded-md"
-    >
+    <div className="flex items-center space-x-2">
       {mqttStatus === "online" ? (
-        <Wifi size={20} className="text-green-400" />
+        <Wifi className="text-green-500" size={18} />
       ) : (
-        <WifiOff size={20} className="text-red-400" />
+        <WifiOff className="text-gray-500" size={18} />
       )}
-      <span>{mqttStatus === "online" ? "Online" : "Offline"}</span>
+      <span className={mqttStatus === "online" ? "text-green-500" : "text-gray-500"}>
+        {mqttStatus === "online" ? "Online" : "Offline"}
+      </span>
     </div>
   );
 };

@@ -7,11 +7,11 @@ const SecondaryCard = ({ title, value, unit, status, bgColor, textColor }) => {
         <h3 className="text-blue-300 text-sm font-medium">{title}</h3>
       </div>
       <div className="p-4 flex items-center justify-between">
-        <div className="text-3xl font-bold">
-          {value} <span className="text-xl">{unit}</span>
+        <div className="text-3xl font-bold text-white">
+          {value} <span className="text-xl text-gray-300">{unit}</span>
         </div>
-        <div className={`p-2 ${bgColor} bg-opacity-20 rounded-lg`}>
-          <span className={textColor}>{status}</span>
+        <div className={`px-3 py-1.5 ${bgColor} rounded-lg`}>
+          <span className={`${textColor} text-sm font-medium`}>{status}</span>
         </div>
       </div>
     </div>

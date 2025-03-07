@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
+import { MapPin } from "lucide-react";
 
-const MapPanel = ({ currentStatus, currentDateTime, deviceId, location }) => {
+const MapPanel = ({ currentStatus, currentDateTime, deviceId, location, mqttStatus }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null); // Simpan referensi peta agar tidak diinisialisasi ulang
 
@@ -48,7 +49,7 @@ const MapPanel = ({ currentStatus, currentDateTime, deviceId, location }) => {
     mapInstance.current = L.map(mapRef.current).setView([latitude, longitude], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
+      attribution: '© OpenStreetMap contributors',
     }).addTo(mapInstance.current);
 
     const marker = L.marker([latitude, longitude]).addTo(mapInstance.current);
@@ -56,29 +57,32 @@ const MapPanel = ({ currentStatus, currentDateTime, deviceId, location }) => {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg h-full">
-      <div className="p-4 bg-gray-700 font-semibold flex items-center justify-between">
-        <span>Lokasi Monitoring</span>
+    <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+      <div className="p-4 bg-gray-700 font-semibold flex items-center">
+        <MapPin className="mr-2" size={20} />
+        Lokasi Monitoring
       </div>
-      <div ref={mapRef} className="h-64" style={{ zIndex: 0 }}></div>
-      <div className="p-4 space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Status</span>
-          <span className={`px-2 py-0.5 rounded ${currentStatus.color.replace('bg-', 'text-')}`}>
-            {currentStatus.status}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Terakhir Update</span>
-          <span>{formattedTime}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Device ID</span>
-          <span>{deviceId}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Koordinat</span>
-          <span>{latitude}, {longitude}</span>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div ref={mapRef} className="h-64 lg:col-span-2"></div>
+        
+        <div className="p-4 flex flex-col justify-center space-y-4">
+          <div className="flex items-center">
+            <div className={`w-3 h-3 rounded-full ${currentStatus.color} mr-2`}></div>
+            <span className="font-semibold">Status</span>
+            <span className="ml-auto">{currentStatus.status}</span>
+          </div>
+          
+          <div className="flex items-center">
+            <mqttStatus.icon className={`${mqttStatus.color} mr-2`} size={16} />
+            <span className="font-semibold">Terakhir Update</span>
+            <span className="ml-auto">{formattedTime}</span>
+          </div>
+          
+          <div className="flex items-center">
+            <span className="font-semibold">Device ID</span>
+            <span className="ml-auto">{deviceId}</span>
+          </div>
         </div>
       </div>
     </div>

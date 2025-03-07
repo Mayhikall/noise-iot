@@ -1,115 +1,53 @@
 import React, { useState, useEffect } from "react";
 import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
-import {
-  Clock,
-  MapPin,
-  Volume2,
-  TrendingDown,
-  BarChart2,
-  Calendar,
-  Menu,
-  X,
-  AlertCircle,
-  Clock3,
-  Wifi,
-  WifiOff,
+  Clock, MapPin, Volume2, TrendingDown, BarChart2,
+  Calendar, Menu, X, AlertCircle, Clock3, Wifi, WifiOff,
+  Download, FileText
 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import ReportTable from "./components/ReportTable";
 import Header from "./components/Header";
 import { getBulanIndonesia, getHariIndonesia } from "./utils";
-import SummaryCard from "./components/SummaryCard";
-import SecondaryCard from "./components/SecondaryCard";
-import TrendChart from "./components/TrendChart";
 import SummaryCardsRow from "./components/SummaryCardRow";
 import SecondaryCardsRow from "./components/SecondaryCardRow";
+import TrendChart from "./components/TrendChart";
 import HourlyChart from "./components/HourlyChart";
 import MinuteChart from "./components/MinuteChart";
 import MapPanel from "./components/MapPanel";
 
-// Sample data generation
-const generateTimeSeriesData = (count, baseValue, variance) => {
-  const data = [];
-  const now = new Date();
-
-  for (let i = count - 1; i >= 0; i--) {
-    const timestamp = new Date(now.getTime() - i * 60000);
-    const time = timestamp.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const value = baseValue + Math.random() * variance * 2 - variance;
-    data.push({
-      time,
-      value: parseFloat(value.toFixed(1)),
-      l10: parseFloat((value - 1.5 + Math.random() * 3).toFixed(1)),
-      l50: parseFloat((value - 2 + Math.random() * 2.5).toFixed(1)),
-      l90: parseFloat((value - 2.5 + Math.random() * 2).toFixed(1)),
-      lmin: parseFloat((value - 3 + Math.random() * 2).toFixed(1)),
-      lmax: parseFloat((value + 2 + Math.random() * 3).toFixed(1)),
-    });
-  }
-  return data;
-};
-
-// Sample report data generation
-const generateReportData = () => {
-  const now = new Date();
-  const baseTime = new Date(now);
-  const reportData = [];
-
-  for (let i = 0; i < 9; i++) {
-    const timestamp = new Date(baseTime.getTime() - i * 5000);
-    const timeString = timestamp.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-
-    reportData.push({
-      l10: 42.3,
-      l50: 41.4,
-      l90: 40.9,
-      value: 41.3 + (Math.random() * 2 - 1),
-      timestamp: timeString,
-      lmax: 53.3 + (Math.random() * 2 - 1),
-      lmin: 40.2 + (Math.random() * 0.5 - 0.25),
-    });
-  }
-
-  return reportData;
-};
+// Import API services
+import {
+  fetchDashboardSummary,
+  fetchLaeqData,
+  fetchLaeqMinuteData,
+  fetchLaeqHourlyData,
+  fetchRealtimeData,
+  fetchMqttStatus,
+  fetchTrendData,
+  exportReportData
+} from "./services/api";
 
 const NoiseDashboard = () => {
   // State Management
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [mqttStatus, setMqttStatus] = useState("online");
   const [timeFilter, setTimeFilter] = useState("daytime");
   const [activeSidebarSection, setActiveSidebarSection] = useState("dashboard");
+  const [reportTimeRange, setReportTimeRange] = useState("15minutes");
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Data States
-  const [trendingData, setTrendingData] = useState(
-    generateTimeSeriesData(60, 42, 5)
-  );
-  const [minuteData, setMinuteData] = useState(
-    generateTimeSeriesData(60, 42, 2)
-  );
-  const [hourlyData, setHourlyData] = useState(
-    generateTimeSeriesData(24, 41.5, 0.5)
-  );
-  const [reportData, setReportData] = useState(generateReportData());
+  const [summaryData, setSummaryData] = useState({
+    latestLaeq: { laeq: 0, L10: 0, L50: 0, L90: 0, Lmax: 0, Lmin: 0 },
+    todayStats: { maxLaeq: 0, minLaeq: 0, avgLaeq: 0 }
+  });
+  const [trendingData, setTrendingData] = useState([]);
+  const [minuteData, setMinuteData] = useState([]);
+  const [hourlyData, setHourlyData] = useState([]);
+  const [reportData, setReportData] = useState([]);
+  const [mqttStatus, setMqttStatus] = useState({ status: "Offline", quality: "Offline" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Sidebar Toggle Function
   const toggleSidebar = () => {
@@ -118,32 +56,28 @@ const NoiseDashboard = () => {
 
   const handleSectionChange = (section) => {
     setActiveSidebarSection(section);
-    // Tambahkan logika navigasi atau perubahan konten sesuai kebutuhan
     console.log(`Navigating to: ${section}`);
   };
 
-  // Current Measurement Values
-  const currentLaeq = 42;
-  const currentL10 = 42.3;
-  const currentL50 = 41.4;
-  const currentL90 = 40.9;
-  const currentLMax = 53.3;
-  const currentLMin = 40.2;
-  const changePercent = -20.9;
+  // Format API data for charts
+  const formatTrendData = (data) => {
+    return data.map(item => ({
+      time: new Date(item.created_at).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit"
+      }),
+      value: item.laeq,
+      l10: item.L10,
+      l50: item.L50,
+      l90: item.L90,
+      lmin: item.Lmin || 0,
+      lmax: item.Lmax || 0
+    }));
+  };
 
   // Status Determination Function
-  const getStatus = (mqttStatus, noiseLevel) => {
-    // First check MQTT connection status
-    if (mqttStatus === "offline") {
-      return {
-        status: "Offline",
-        color: "bg-gray-500",
-        icon: WifiOff,
-        description: "Koneksi perangkat terputus",
-      };
-    }
-
-    // If MQTT is online, then check noise level
+  const getStatus = (noiseLevel) => {
+    // Check noise level only
     if (noiseLevel < 45) {
       return {
         status: "Baik",
@@ -170,8 +104,54 @@ const NoiseDashboard = () => {
     };
   };
 
+  // MQTT Status Icon and Color
+  const getMqttStatusDisplay = () => {
+    if (mqttStatus.status === "Offline") {
+      return {
+        icon: WifiOff,
+        color: "text-gray-500",
+        text: "Offline"
+      };
+    }
+    
+    switch (mqttStatus.quality) {
+      case "Baik":
+        return {
+          icon: Wifi,
+          color: "text-green-500",
+          text: "Sinyal Baik"
+        };
+      case "Sedang":
+        return {
+          icon: Wifi,
+          color: "text-yellow-500",
+          text: "Sinyal Sedang"
+        };
+      case "Lemah":
+        return {
+          icon: Wifi,
+          color: "text-red-500",
+          text: "Sinyal Lemah"
+        };
+      default:
+        return {
+          icon: WifiOff,
+          color: "text-gray-500",
+          text: "Unknown"
+        };
+    }
+  };
+
+  // Get current values from summary data
+  const currentLaeq = summaryData.latestLaeq?.laeq || 0;
+  const currentL10 = summaryData.latestLaeq?.L10 || 0;
+  const currentL50 = summaryData.latestLaeq?.L50 || 0;
+  const currentL90 = summaryData.latestLaeq?.L90 || 0;
+  const currentLMax = summaryData.latestLaeq?.Lmax || 0;
+  const currentLMin = summaryData.latestLaeq?.Lmin || 0;
+
   // Derive current status
-  const currentStatus = getStatus(mqttStatus, currentLaeq);
+  const currentStatus = getStatus(currentLaeq);
 
   // Time and Date Formatting
   const formattedDate = `${getHariIndonesia(
@@ -188,30 +168,230 @@ const NoiseDashboard = () => {
 
   // Data Filtering Function
   const filterDataByTimePeriod = (data) => {
-    return data.filter((_, index) => {
-      const simulatedHour = (7 + Math.floor(index / 2.5)) % 24;
+    return data.filter((item) => {
+      if (!item.time && !item.created_at) return true;
+      
+      let hour;
+      if (item.created_at) {
+        const itemTime = new Date(item.created_at);
+        hour = itemTime.getHours();
+      } else {
+        // Extract hour from time string (format: "HH:MM")
+        const timeParts = item.time.split(':');
+        hour = parseInt(timeParts[0], 10);
+      }
+      
       return timeFilter === "daytime"
-        ? simulatedHour >= 7 && simulatedHour < 19
-        : simulatedHour < 7 || simulatedHour >= 19;
+        ? hour >= 7 && hour < 19
+        : hour < 7 || hour >= 19;
     });
   };
 
-  // Toggle MQTT Status (for demonstration)
-  const toggleMqttStatus = () => {
-    setMqttStatus(mqttStatus === "online" ? "offline" : "online");
+  // Fetch dashboard summary data
+  const fetchSummaryData = async () => {
+    try {
+      const summary = await fetchDashboardSummary();
+      setSummaryData(summary);
+      console.log("Summary data loaded:", summary);
+    } catch (err) {
+      console.error("Error loading summary data:", err);
+      setError("Failed to load dashboard data");
+    }
   };
 
-  // Periodic Data and Time Updates
+  // Fetch trend data - now using the new fetchTrendData function
+  const loadTrendData = async () => {
+    try {
+      const limit = 60;
+      const response = await fetchTrendData({ limit });
+      const formattedData = formatTrendData(response);
+      setTrendingData(formattedData);
+      console.log("Trend data loaded:", formattedData);
+    } catch (err) {
+      console.error("Error loading trend data:", err);
+    }
+  };
+
+  // Fetch minute data
+  const fetchMinuteData = async () => {
+    try {
+      const response = await fetchLaeqMinuteData({ limit: 60 });
+      const minuteData = formatTrendData(response);
+      setMinuteData(minuteData);
+      console.log("Minute data loaded:", minuteData);
+    } catch (err) {
+      console.error("Error loading minute data:", err);
+    }
+  };
+
+  // Fetch hourly data
+  const fetchHourlyData = async () => {
+    try {
+      const response = await fetchLaeqHourlyData({ limit: 24 });
+      const hourlyData = formatTrendData(response);
+      setHourlyData(hourlyData);
+      console.log("Hourly data loaded:", hourlyData);
+    } catch (err) {
+      console.error("Error loading hourly data:", err);
+    }
+  };
+
+  // Fetch report data - will now include all needed fields
+  const fetchReportData = async () => {
+    try {
+      const response = await fetchRealtimeData({ 
+        limit: 10,
+        timeRange: reportTimeRange 
+      });
+      
+      const reportData = response.map(item => ({
+        l10: item.L10 || 0,
+        l50: item.L50 || 0,
+        l90: item.L90 || 0,
+        value: item.laeq || 0,
+        timestamp: new Date(item.created_at).toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+        lmax: item.Lmax || 0,
+        lmin: item.Lmin || 0,
+        created_at: item.created_at
+      }));
+      
+      setReportData(reportData);
+      console.log("Report data loaded:", reportData);
+    } catch (err) {
+      console.error("Error loading report data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch MQTT status
+  const fetchMqttStatusData = async () => {
+    try {
+      const status = await fetchMqttStatus();
+      setMqttStatus(status);
+      console.log("MQTT status loaded:", status);
+    } catch (err) {
+      console.error("Error loading MQTT status:", err);
+      setMqttStatus({ status: "Offline", quality: "Offline" });
+    }
+  };
+
+  // Handle export report
+  const handleExportReport = async (format) => {
+    try {
+      setExportLoading(true);
+      await exportReportData(format, reportTimeRange);
+      setExportLoading(false);
+    } catch (err) {
+      console.error(`Error exporting ${format} report:`, err);
+      setExportLoading(false);
+      // Show error notification
+      alert(`Failed to export ${format} report. Please try again.`);
+    }
+  };
+
+  // Handle report time range change
+  const handleReportTimeRangeChange = (range) => {
+    setReportTimeRange(range);
+    // Reload report data with new time range
+    fetchReportData();
+  };
+
+  // Initial data loading
+  useEffect(() => {
+    const loadAllData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchSummaryData(),
+          loadTrendData(),
+          fetchMinuteData(),
+          fetchHourlyData(),
+          fetchReportData(),
+          fetchMqttStatusData()
+        ]);
+      } catch (err) {
+        setError("Failed to load dashboard data");
+        console.error("Error loading data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadAllData();
+  }, []);
+
+  // Reload report data when time range changes
+  useEffect(() => {
+    fetchReportData();
+  }, [reportTimeRange]);
+
+  // Periodic data and time updates (every 30 seconds)
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentDateTime(new Date());
-      setTrendingData(generateTimeSeriesData(60, 42, 5));
-      setMinuteData(generateTimeSeriesData(60, 42, 2));
-      setReportData(generateReportData());
+      fetchSummaryData();
+      loadTrendData();
+      fetchReportData();
+      fetchMqttStatusData();
     }, 30000);
 
     return () => clearInterval(timer);
   }, []);
+
+  // Update minute data every 5 minutes
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchMinuteData();
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Update hourly data every hour
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchHourlyData();
+    }, 3600000); // 1 hour
+
+    return () => clearInterval(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-blue-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-xl">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-blue-900 text-white">
+        <div className="text-center p-8 bg-gray-800 rounded-lg">
+          <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
+          <h2 className="text-2xl font-bold mb-2">Error</h2>
+          <p className="text-xl mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            Refresh Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Get MQTT status display properties
+  const mqttStatusDisplay = getMqttStatusDisplay();
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
@@ -224,24 +404,24 @@ const NoiseDashboard = () => {
 
       {/* Main content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
         <Header
-          mqttStatus={mqttStatus}
-          toggleMqttStatus={toggleMqttStatus}
           formattedDate={formattedDate}
           formattedTime={formattedTime}
+          mqttStatus={mqttStatusDisplay}
         />
 
         {/* Dashboard content */}
         <div className="p-6">
-        <div className="lg:col-span-1 mb-6">
+          <div className="lg:col-span-1 mb-6">
             <MapPanel
               currentStatus={currentStatus}
               currentDateTime={currentDateTime}
               deviceId="EETSB"
               location="Jalan Raya 72"
+              mqttStatus={mqttStatusDisplay}
             />
           </div>
+          
           {/* Summary Cards */}
           <div className="lg:col-span-3">
             <SummaryCardsRow
@@ -261,8 +441,6 @@ const NoiseDashboard = () => {
             </div>
           </div>
 
-          
-
           {/* Charts Section */}
           <div className="mb-6">
             <TrendChart
@@ -271,20 +449,57 @@ const NoiseDashboard = () => {
               onTimeFilterChange={setTimeFilter}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               <MinuteChart data={minuteData} />
               <HourlyChart data={hourlyData} />
             </div>
           </div>
+          
           {/* Report Section */}
-          <ReportTable
-            reportData={reportData}
-            currentDateTime={currentDateTime}
-          />
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Data Laporan</h2>
+              
+              <div className="flex space-x-2">
+                {/* Time Range Selector */}
+                <select
+                  value={reportTimeRange}
+                  onChange={(e) => handleReportTimeRangeChange(e.target.value)}
+                  className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
+                >
+                  <option value="15minutes">15 Menit</option>
+                  <option value="1hour">1 Jam</option>
+                </select>
+                
+                {/* Export Buttons */}
+                <button
+                  onClick={() => handleExportReport('excel')}
+                  disabled={exportLoading}
+                  className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded"
+                >
+                  <FileText size={16} />
+                  <span>Excel</span>
+                </button>
+                
+                <button
+                  onClick={() => handleExportReport('pdf')}
+                  disabled={exportLoading}
+                  className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded"
+                >
+                  <Download size={16} />
+                  <span>PDF</span>
+                </button>
+              </div>
+            </div>
+            
+            <ReportTable
+              reportData={reportData}
+              currentDateTime={currentDateTime}
+              timeRange={reportTimeRange}
+            />
+          </div>
         </div>
       </div>
-
-      {/* Map Panel - in a collapsible side panel */}
     </div>
   );
 };

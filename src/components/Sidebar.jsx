@@ -13,7 +13,10 @@ const SidebarItem = ({ icon: Icon, label, isActive = false, isSidebarOpen, onCli
   return (
     <a
       href="#"
-      onClick={onClick}
+      onClick={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
       className={`
         flex items-center 
         ${isSidebarOpen ? 'px-4 py-3 rounded-r-full' : 'justify-center py-3'}
@@ -73,14 +76,14 @@ const Sidebar = ({
         {isSidebarOpen && (
           <div className="flex items-center">
             <div className="h-8 w-8 bg-gradient-to-br from-green-400 to-blue-500 rounded-md flex items-center justify-center">
-              <Volume2 size={18} />
+              <Volume2 size={18} className="text-white" />
             </div>
-            <span className="ml-2 font-bold">EcoSound</span>
+            <span className="ml-2 font-bold text-white">EcoSound</span>
           </div>
         )}
         <button
           onClick={toggleSidebar}
-          className="p-1 rounded-md hover:bg-gray-700"
+          className="p-1 rounded-md hover:bg-gray-700 text-gray-300"
         >
           <Menu size={20} />
         </button>
