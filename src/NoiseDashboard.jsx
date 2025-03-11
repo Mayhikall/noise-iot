@@ -25,6 +25,7 @@ import TrendChart from "./components/TrendChart";
 import HourlyChart from "./components/HourlyChart";
 import MinuteChart from "./components/MinuteChart";
 import MapPanel from "./components/MapPanel";
+import Footer from "./components/Footer";
 
 // Import API services
 import {
@@ -464,129 +465,130 @@ const NoiseDashboard = () => {
   const mqttStatusDisplay = getMqttStatusDisplay();
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
-      <Sidebar
-        isSidebarOpen={isSidebarOpen}
-        toggleSidebar={toggleSidebar}
-        activeSection={activeSidebarSection}
-        onSectionChange={handleSectionChange}
-      />
-
-      {/* Main content */}
-      <div className="flex-1 overflow-auto">
-        <Header
-          formattedDate={formattedDate}
-          formattedTime={formattedTime}
-          mqttStatus={mqttStatusDisplay}
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          isSidebarOpen={isSidebarOpen}
+          toggleSidebar={toggleSidebar}
+          activeSection={activeSidebarSection}
+          onSectionChange={handleSectionChange}
         />
-
-        {/* Dashboard content */}
-        <div className="p-6">
-          <div className="lg:col-span-1 mb-6">
-            <MapPanel
-              currentStatus={currentStatus}
-              deviceId="EETSB"
-              mqttStatus={{
-                ...mqttStatus,
-                text: mqttStatusDisplay.text,
-                color: mqttStatusDisplay.color,
-                icon: mqttStatusDisplay.icon,
-                // Ensure we have the correct timestamp properties
-                lastUpdated:
-                  mqttStatus.lastUpdated ||
-                  mqttStatus.updated_at ||
-                  new Date().toISOString(),
-                lastOnlineTimestamp:
-                  mqttStatus.lastOnlineTimestamp || mqttStatus.lastUpdated,
-                // Make sure status is properly parsed from combined string if needed
-                status:
-                  mqttStatus.status && mqttStatus.status.startsWith("Online")
-                    ? "Online"
-                    : mqttStatus.status,
-              }}
-            />
-          </div>
-
-          {/* Summary Cards */}
-          <div className="lg:col-span-3">
-            <SummaryCardsRow
-              currentLaeq={currentLaeq}
-              currentL10={currentL10}
-              currentL50={currentL50}
-              currentL90={currentL90}
-              currentStatus={currentStatus}
-            />
-
-            <div className="mt-6">
-              <SecondaryCardsRow
-                currentLMin={currentLMin}
-                currentLMax={currentLMax}
+        {/* Main content */}
+        <div className="flex-1 flex flex-col overflow-auto">
+          <Header
+            formattedDate={formattedDate}
+            formattedTime={formattedTime}
+            mqttStatus={mqttStatusDisplay}
+          />
+          {/* Dashboard content */}
+          <div className="p-6 overflow-auto">
+            <div className="lg:col-span-1 mb-6">
+              <MapPanel
                 currentStatus={currentStatus}
+                deviceId="EETSB"
+                mqttStatus={{
+                  ...mqttStatus,
+                  text: mqttStatusDisplay.text,
+                  color: mqttStatusDisplay.color,
+                  icon: mqttStatusDisplay.icon,
+                  lastUpdated:
+                    mqttStatus.lastUpdated ||
+                    mqttStatus.updated_at ||
+                    new Date().toISOString(),
+                  lastOnlineTimestamp:
+                    mqttStatus.lastOnlineTimestamp || mqttStatus.lastUpdated,
+                  status:
+                    mqttStatus.status && mqttStatus.status.startsWith("Online")
+                      ? "Online"
+                      : mqttStatus.status,
+                }}
+              />
+            </div>
+  
+            {/* Summary Cards */}
+            <div className="lg:col-span-3">
+              <SummaryCardsRow
+                currentLaeq={currentLaeq}
+                currentL10={currentL10}
+                currentL50={currentL50}
+                currentL90={currentL90}
+                currentStatus={currentStatus}
+              />
+  
+              <div className="mt-6">
+                <SecondaryCardsRow
+                  currentLMin={currentLMin}
+                  currentLMax={currentLMax}
+                  currentStatus={currentStatus}
+                />
+              </div>
+            </div>
+  
+            {/* Charts Section */}
+            <div className="mb-6">
+              <TrendChart
+                data={filterDataByTimePeriod(trendingData)}
+                timeFilter={timeFilter}
+                onTimeFilterChange={setTimeFilter}
+              />
+  
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <MinuteChart data={minuteData} />
+                <HourlyChart data={hourlyData} />
+              </div>
+            </div>
+  
+            {/* Report Section */}
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Data Laporan</h2>
+  
+                <div className="flex space-x-2">
+                  {/* Time Range Selector */}
+                  <select
+                    value={reportTimeRange}
+                    onChange={(e) => handleReportTimeRangeChange(e.target.value)}
+                    className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
+                  >
+                    <option value="15minutes">15 Menit</option>
+                    <option value="1hour">1 Jam</option>
+                  </select>
+  
+                  {/* Export Buttons */}
+                  <button
+                    onClick={() => handleExportReport("excel")}
+                    disabled={exportLoading}
+                    className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText size={16} />
+                    <span>Excel</span>
+                  </button>
+  
+                  <button
+                    onClick={() => handleExportReport("pdf")}
+                    disabled={exportLoading}
+                    className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Download size={16} />
+                    <span>PDF</span>
+                  </button>
+                </div>
+              </div>
+  
+              <ReportTable
+                reportData={reportData}
+                currentDateTime={currentDateTime}
+                timeRange={reportTimeRange}
               />
             </div>
           </div>
-
-          {/* Charts Section */}
-          <div className="mb-6">
-            <TrendChart
-              data={filterDataByTimePeriod(trendingData)}
-              timeFilter={timeFilter}
-              onTimeFilterChange={setTimeFilter}
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-              <MinuteChart data={minuteData} />
-              <HourlyChart data={hourlyData} />
-            </div>
-          </div>
-
-          {/* Report Section */}
-          <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Data Laporan</h2>
-
-              <div className="flex space-x-2">
-                {/* Time Range Selector */}
-                <select
-                  value={reportTimeRange}
-                  onChange={(e) => handleReportTimeRangeChange(e.target.value)}
-                  className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
-                >
-                  <option value="15minutes">15 Menit</option>
-                  <option value="1hour">1 Jam</option>
-                </select>
-
-                {/* Export Buttons */}
-                <button
-                  onClick={() => handleExportReport("excel")}
-                  disabled={exportLoading}
-                  className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <FileText size={16} />
-                  <span>Excel</span>
-                </button>
-
-                <button
-                  onClick={() => handleExportReport("pdf")}
-                  disabled={exportLoading}
-                  className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download size={16} />
-                  <span>PDF</span>
-                </button>
-              </div>
-            </div>
-
-            <ReportTable
-              reportData={reportData}
-              currentDateTime={currentDateTime}
-              timeRange={reportTimeRange}
-            />
-          </div>
+          
+          {/* Footer */}
+          <Footer />
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default NoiseDashboard;
