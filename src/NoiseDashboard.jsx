@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from "react";
 import {
-  Clock, MapPin, Volume2, TrendingDown, BarChart2,
-  Calendar, Menu, X, AlertCircle, Clock3, Wifi, WifiOff,
-  Download, FileText
+  Clock,
+  MapPin,
+  Volume2,
+  TrendingDown,
+  BarChart2,
+  Calendar,
+  Menu,
+  X,
+  AlertCircle,
+  Clock3,
+  Wifi,
+  WifiOff,
+  Download,
+  FileText,
 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import ReportTable from "./components/ReportTable";
@@ -24,7 +35,7 @@ import {
   fetchRealtimeData,
   fetchMqttStatus,
   fetchTrendData,
-  exportReportData
+  exportReportData,
 } from "./services/api";
 
 const NoiseDashboard = () => {
@@ -39,13 +50,16 @@ const NoiseDashboard = () => {
   // Data States
   const [summaryData, setSummaryData] = useState({
     latestLaeq: { laeq: 0, L10: 0, L50: 0, L90: 0, Lmax: 0, Lmin: 0 },
-    todayStats: { maxLaeq: 0, minLaeq: 0, avgLaeq: 0 }
+    todayStats: { maxLaeq: 0, minLaeq: 0, avgLaeq: 0 },
   });
   const [trendingData, setTrendingData] = useState([]);
   const [minuteData, setMinuteData] = useState([]);
   const [hourlyData, setHourlyData] = useState([]);
   const [reportData, setReportData] = useState([]);
-  const [mqttStatus, setMqttStatus] = useState({ status: "Offline", quality: "Offline" });
+  const [mqttStatus, setMqttStatus] = useState({
+    status: "Offline",
+    quality: "Offline",
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -61,94 +75,131 @@ const NoiseDashboard = () => {
 
   // Format API data for charts
   const formatTrendData = (data) => {
-    return data.map(item => ({
+    if (!data || !Array.isArray(data)) return [];
+
+    return data.map((item) => ({
       time: new Date(item.created_at).toLocaleTimeString("id-ID", {
         hour: "2-digit",
-        minute: "2-digit"
+        minute: "2-digit",
       }),
-      value: item.laeq,
-      l10: item.L10,
-      l50: item.L50,
-      l90: item.L90,
+      value: item.laeq || 0,
+      l10: item.L10 || 0,
+      l50: item.L50 || 0,
+      l90: item.L90 || 0,
       lmin: item.Lmin || 0,
-      lmax: item.Lmax || 0
+      lmax: item.Lmax || 0,
     }));
   };
 
   // Status Determination Function
   const getStatus = (noiseLevel) => {
-    // Check noise level only
-    if (noiseLevel < 45) {
+    if (noiseLevel <= 15) {
       return {
-        status: "Baik",
-        color: "bg-green-500",
+        status: "Silent",
+        color: "bg-green-800",
         icon: Volume2,
-        description: "Tingkat kebisingan rendah",
+        description: "Hening, hampir tidak ada suara",
       };
     }
-
-    if (noiseLevel < 55) {
+  
+    if (noiseLevel <= 20) {
       return {
-        status: "Sedang",
+        status: "Quiet",
+        color: "bg-green-600",
+        icon: Volume2,
+        description: "Suara sangat pelan",
+      };
+    }
+  
+    if (noiseLevel <= 40) {
+      return {
+        status: "Whispered",
+        color: "bg-green-400",
+        icon: Volume2,
+        description: "Berbisik, sangat tenang",
+      };
+    }
+  
+    if (noiseLevel <= 60) {
+      return {
+        status: "Normal",
         color: "bg-yellow-500",
         icon: Volume2,
-        description: "Tingkat kebisingan normal",
+        description: "Percakapan normal",
       };
     }
-
+  
+    if (noiseLevel <= 90) {
+      return {
+        status: "High",
+        color: "bg-orange-500",
+        icon: Volume2,
+        description: "Mulai merusak pendengaran",
+      };
+    }
+  
+    if (noiseLevel <= 100) {
+      return {
+        status: "Very High",
+        color: "bg-orange-700",
+        icon: Volume2,
+        description: "Kehilangan pendengaran bisa terjadi",
+      };
+    }
+  
     return {
-      status: "Tinggi",
-      color: "bg-red-500",
+      status: "Extreme",
+      color: "bg-red-700",
       icon: Volume2,
-      description: "Tingkat kebisingan tinggi",
+      description: "Bahaya! Kerusakan pendengaran serius",
     };
   };
-
+  
   // MQTT Status Icon and Color
   const getMqttStatusDisplay = () => {
-    if (mqttStatus.status === "Offline") {
+    if (!mqttStatus || mqttStatus.status === "Offline") {
       return {
         icon: WifiOff,
         color: "text-gray-500",
-        text: "Offline"
+        text: "Offline",
       };
     }
-    
+
     switch (mqttStatus.quality) {
       case "Baik":
         return {
           icon: Wifi,
           color: "text-green-500",
-          text: "Sinyal Baik"
+          text: "Sinyal Baik",
         };
       case "Sedang":
         return {
           icon: Wifi,
           color: "text-yellow-500",
-          text: "Sinyal Sedang"
+          text: "Sinyal Sedang",
         };
       case "Lemah":
         return {
           icon: Wifi,
           color: "text-red-500",
-          text: "Sinyal Lemah"
+          text: "Sinyal Lemah",
         };
       default:
         return {
           icon: WifiOff,
           color: "text-gray-500",
-          text: "Unknown"
+          text: "Unknown",
         };
     }
   };
 
   // Get current values from summary data
-  const currentLaeq = summaryData.latestLaeq?.laeq || 0;
-  const currentL10 = summaryData.latestLaeq?.L10 || 0;
-  const currentL50 = summaryData.latestLaeq?.L50 || 0;
-  const currentL90 = summaryData.latestLaeq?.L90 || 0;
-  const currentLMax = summaryData.latestLaeq?.Lmax || 0;
-  const currentLMin = summaryData.latestLaeq?.Lmin || 0;
+  const currentLaeq = summaryData?.latestLaeq?.laeq || 0;
+  const currentL10 = summaryData?.latestLaeq?.L10 || 0;
+  const currentL50 = summaryData?.latestLaeq?.L50 || 0;
+  const currentL90 = summaryData?.latestLaeq?.L90 || 0;
+  const currentLMax = summaryData?.latestLaeq?.Lmax || 0;
+  const currentLMin = summaryData?.latestLaeq?.Lmin || 0;
 
   // Derive current status
   const currentStatus = getStatus(currentLaeq);
@@ -168,19 +219,27 @@ const NoiseDashboard = () => {
 
   // Data Filtering Function
   const filterDataByTimePeriod = (data) => {
+    if (!data || !Array.isArray(data)) return [];
+
     return data.filter((item) => {
-      if (!item.time && !item.created_at) return true;
-      
+      if (!item || (!item.time && !item.created_at)) return false;
+
       let hour;
       if (item.created_at) {
         const itemTime = new Date(item.created_at);
         hour = itemTime.getHours();
-      } else {
+      } else if (item.time) {
         // Extract hour from time string (format: "HH:MM")
-        const timeParts = item.time.split(':');
-        hour = parseInt(timeParts[0], 10);
+        const timeParts = item.time.split(":");
+        if (timeParts.length >= 1) {
+          hour = parseInt(timeParts[0], 10);
+        } else {
+          return true; // If we can't parse the time, include the item
+        }
+      } else {
+        return true; // If no time information, include the item
       }
-      
+
       return timeFilter === "daytime"
         ? hour >= 7 && hour < 19
         : hour < 7 || hour >= 19;
@@ -239,12 +298,17 @@ const NoiseDashboard = () => {
   // Fetch report data - will now include all needed fields
   const fetchReportData = async () => {
     try {
-      const response = await fetchRealtimeData({ 
+      const response = await fetchRealtimeData({
         limit: 10,
-        timeRange: reportTimeRange 
+        timeRange: reportTimeRange,
       });
-      
-      const reportData = response.map(item => ({
+
+      if (!response || !Array.isArray(response)) {
+        setReportData([]);
+        return;
+      }
+
+      const reportData = response.map((item) => ({
         l10: item.L10 || 0,
         l50: item.L50 || 0,
         l90: item.L90 || 0,
@@ -256,19 +320,20 @@ const NoiseDashboard = () => {
         }),
         lmax: item.Lmax || 0,
         lmin: item.Lmin || 0,
-        created_at: item.created_at
+        created_at: item.created_at,
       }));
-      
+
       setReportData(reportData);
       console.log("Report data loaded:", reportData);
     } catch (err) {
       console.error("Error loading report data:", err);
+      setReportData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch MQTT status
+  // Update the fetchMqttStatusData function
   const fetchMqttStatusData = async () => {
     try {
       const status = await fetchMqttStatus();
@@ -276,7 +341,12 @@ const NoiseDashboard = () => {
       console.log("MQTT status loaded:", status);
     } catch (err) {
       console.error("Error loading MQTT status:", err);
-      setMqttStatus({ status: "Offline", quality: "Offline" });
+      setMqttStatus({
+        status: "Offline",
+        quality: "Offline",
+        lastUpdated: new Date().toISOString(),
+        lastOnlineTimestamp: null,
+      });
     }
   };
 
@@ -312,7 +382,7 @@ const NoiseDashboard = () => {
           fetchMinuteData(),
           fetchHourlyData(),
           fetchReportData(),
-          fetchMqttStatusData()
+          fetchMqttStatusData(),
         ]);
       } catch (err) {
         setError("Failed to load dashboard data");
@@ -321,7 +391,7 @@ const NoiseDashboard = () => {
         setLoading(false);
       }
     };
-    
+
     loadAllData();
   }, []);
 
@@ -379,8 +449,8 @@ const NoiseDashboard = () => {
           <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
           <h2 className="text-2xl font-bold mb-2">Error</h2>
           <p className="text-xl mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700"
           >
             Refresh Dashboard
@@ -415,13 +485,28 @@ const NoiseDashboard = () => {
           <div className="lg:col-span-1 mb-6">
             <MapPanel
               currentStatus={currentStatus}
-              currentDateTime={currentDateTime}
               deviceId="EETSB"
-              location="Jalan Raya 72"
-              mqttStatus={mqttStatusDisplay}
+              mqttStatus={{
+                ...mqttStatus,
+                text: mqttStatusDisplay.text,
+                color: mqttStatusDisplay.color,
+                icon: mqttStatusDisplay.icon,
+                // Ensure we have the correct timestamp properties
+                lastUpdated:
+                  mqttStatus.lastUpdated ||
+                  mqttStatus.updated_at ||
+                  new Date().toISOString(),
+                lastOnlineTimestamp:
+                  mqttStatus.lastOnlineTimestamp || mqttStatus.lastUpdated,
+                // Make sure status is properly parsed from combined string if needed
+                status:
+                  mqttStatus.status && mqttStatus.status.startsWith("Online")
+                    ? "Online"
+                    : mqttStatus.status,
+              }}
             />
           </div>
-          
+
           {/* Summary Cards */}
           <div className="lg:col-span-3">
             <SummaryCardsRow
@@ -454,12 +539,12 @@ const NoiseDashboard = () => {
               <HourlyChart data={hourlyData} />
             </div>
           </div>
-          
+
           {/* Report Section */}
           <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Data Laporan</h2>
-              
+
               <div className="flex space-x-2">
                 {/* Time Range Selector */}
                 <select
@@ -470,28 +555,28 @@ const NoiseDashboard = () => {
                   <option value="15minutes">15 Menit</option>
                   <option value="1hour">1 Jam</option>
                 </select>
-                
+
                 {/* Export Buttons */}
                 <button
-                  onClick={() => handleExportReport('excel')}
+                  onClick={() => handleExportReport("excel")}
                   disabled={exportLoading}
-                  className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded"
+                  className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FileText size={16} />
                   <span>Excel</span>
                 </button>
-                
+
                 <button
-                  onClick={() => handleExportReport('pdf')}
+                  onClick={() => handleExportReport("pdf")}
                   disabled={exportLoading}
-                  className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded"
+                  className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download size={16} />
                   <span>PDF</span>
                 </button>
               </div>
             </div>
-            
+
             <ReportTable
               reportData={reportData}
               currentDateTime={currentDateTime}

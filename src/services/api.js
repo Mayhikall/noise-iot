@@ -7,6 +7,25 @@ const api = axios.create({
   timeout: 10000,
 });
 
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API request failed:', error);
+    // Enhanced error handling
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Error data:', error.response.data);
+      console.error('Error status:', error.response.status);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received:', error.request);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const fetchDashboardSummary = async () => {
   try {
     // Fetch LAeq from tbl_laeq for latest LAeq
@@ -24,14 +43,14 @@ export const fetchDashboardSummary = async () => {
       } 
     });
 
-    // Combine the data
+    // Combine the data with proper null checks
     const latestLaeq = {
-      laeq: laeqResponse.data[0]?.laeq || 0,
-      L10: realTimeResponse.data[0]?.L10 || 0,
-      L50: realTimeResponse.data[0]?.L50 || 0,
-      L90: realTimeResponse.data[0]?.L90 || 0,
-      Lmax: hourlyResponse.data[0]?.Lmax || 0,
-      Lmin: hourlyResponse.data[0]?.Lmin || 0
+      laeq: laeqResponse.data?.[0]?.laeq || 0,
+      L10: realTimeResponse.data?.[0]?.L10 || 0,
+      L50: realTimeResponse.data?.[0]?.L50 || 0,
+      L90: realTimeResponse.data?.[0]?.L90 || 0,
+      Lmax: hourlyResponse.data?.[0]?.Lmax || 0,
+      Lmin: hourlyResponse.data?.[0]?.Lmin || 0
     };
     
     // Get today's stats - calculate from hourly data
@@ -45,12 +64,14 @@ export const fetchDashboardSummary = async () => {
     const todayData = todayHourlyResponse.data || [];
     
     const todayStats = {
-      maxLaeq: Math.max(...todayData.map(item => item.laeq || 0), 0),
+      maxLaeq: todayData.length > 0 
+        ? Math.max(...todayData.map(item => item?.laeq || 0), 0)
+        : 0,
       minLaeq: todayData.length > 0 
-        ? Math.min(...todayData.map(item => item.laeq || 0)) 
+        ? Math.min(...todayData.filter(item => item?.laeq != null).map(item => item.laeq), 0)
         : 0,
       avgLaeq: todayData.length > 0
-        ? (todayData.reduce((sum, item) => sum + (item.laeq || 0), 0) / todayData.length).toFixed(1)
+        ? (todayData.reduce((sum, item) => sum + (item?.laeq || 0), 0) / todayData.length).toFixed(1)
         : 0
     };
 
@@ -60,7 +81,11 @@ export const fetchDashboardSummary = async () => {
     };
   } catch (error) {
     console.error('Error fetching dashboard summary:', error);
-    throw error;
+    // Return default values on error
+    return {
+      latestLaeq: { laeq: 0, L10: 0, L50: 0, L90: 0, Lmax: 0, Lmin: 0 },
+      todayStats: { maxLaeq: 0, minLaeq: 0, avgLaeq: 0 }
+    };
   }
 };
 
@@ -68,10 +93,10 @@ export const fetchLaeqData = async (params = {}) => {
   try {
     // Fetch from tbl_laeq for Realtime LAeq
     const response = await api.get('/tbl-laeq', { params });
-    return response.data;
+    return response.data || [];
   } catch (error) {
     console.error('Error fetching LAeq data:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -81,10 +106,10 @@ export const fetchLaeqMinuteData = async (params = {}) => {
     const response = await api.get('/laeq-data', { 
       params: { ...params, type: '1min' } 
     });
-    return response.data;
+    return response.data || [];
   } catch (error) {
     console.error('Error fetching LAeq minute data:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -92,10 +117,10 @@ export const fetchLaeqHourlyData = async (params = {}) => {
   try {
     // Fetch from laeq_hourly for Hourly LAeq
     const response = await api.get('/laeq-hourly', { params });
-    return response.data;
+    return response.data || [];
   } catch (error) {
     console.error('Error fetching LAeq hourly data:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -108,6 +133,11 @@ export const fetchRealtimeData = async (params = {}) => {
         sort: 'created_at,desc' 
       } 
     });
+    
+    // If no data, return early
+    if (!realtimeResponse.data || realtimeResponse.data.length === 0) {
+      return [];
+    }
     
     // Fetch corresponding LAeq data from tbl_laeq
     const laeqResponse = await api.get('/tbl-laeq', { 
@@ -127,10 +157,14 @@ export const fetchRealtimeData = async (params = {}) => {
     
     // Combine data by timestamp (closest match)
     const combinedData = realtimeResponse.data.map(rtItem => {
+      if (!rtItem || !rtItem.created_at) return null;
+      
       const rtTimestamp = new Date(rtItem.created_at).getTime();
       
       // Find closest LAeq entry
-      const laeqItem = laeqResponse.data.reduce((closest, item) => {
+      const laeqItem = (laeqResponse.data || []).reduce((closest, item) => {
+        if (!item || !item.created_at) return closest;
+        
         const itemTime = new Date(item.created_at).getTime();
         const closestTime = closest ? new Date(closest.created_at).getTime() : null;
         
@@ -141,7 +175,9 @@ export const fetchRealtimeData = async (params = {}) => {
       }, null);
       
       // Find closest hourly entry
-      const hourlyItem = hourlyResponse.data.reduce((closest, item) => {
+      const hourlyItem = (hourlyResponse.data || []).reduce((closest, item) => {
+        if (!item || !item.created_at) return closest;
+        
         const itemTime = new Date(item.created_at).getTime();
         const closestTime = closest ? new Date(closest.created_at).getTime() : null;
         
@@ -157,32 +193,157 @@ export const fetchRealtimeData = async (params = {}) => {
         Lmin: hourlyItem?.Lmin || 0,
         Lmax: hourlyItem?.Lmax || 0,
       };
-    });
+    }).filter(Boolean); // Remove any null entries
     
     return combinedData;
   } catch (error) {
     console.error('Error fetching realtime data:', error);
-    throw error;
+    return [];
   }
 };
 
 export const fetchMqttStatus = async () => {
   try {
-    const response = await api.get('/mqtt-status', { params: { limit: 1 } });
-    const mqttData = response.data[0] || { status: 'Offline' };
+    // Get the most recent MQTT status record
+    const response = await api.get('/mqtt-status', { 
+      params: { 
+        limit: 1,
+        sort: 'updated_at,desc'  // Ensure we get the most recent record by updated_at
+      } 
+    });
+    
+    // Default values if no data is found
+    let mqttData = { 
+      status: 'Offline', 
+      quality: 'Offline', 
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      lastOnlineTimestamp: null
+    };
+    
+    // If we have data from response, use it
+    if (response.data && response.data.length > 0) {
+      mqttData = response.data[0];
+      
+      // Parse combined status if necessary (e.g., "Online2025-03-03 11:51:53")
+      if (mqttData.status && mqttData.status.startsWith("Online")) {
+        // Extract timestamp from status if it's embedded
+        if (mqttData.status.length > 6) { // "Online" + something else
+          const timestampMatch = mqttData.status.match(/Online(.*)/);
+          if (timestampMatch && timestampMatch[1]) {
+            try {
+              // Extract the timestamp part and trim it
+              const timestampPart = timestampMatch[1].trim();
+              // Store the original timestamp
+              mqttData.statusTimestamp = timestampPart;
+              
+              // Convert timestamp to the correct format using proper date parsing
+              // This properly handles various date formats that might be in the database
+              const parsedDate = new Date(timestampPart);
+              if (!isNaN(parsedDate.getTime())) {
+                mqttData.lastOnlineTimestamp = parsedDate.toISOString();
+              }
+            } catch (e) {
+              console.error("Error parsing embedded timestamp:", e);
+            }
+          }
+        }
+        
+        // Set clean status regardless of timestamp extraction success
+        mqttData.status = "Online";
+      }
+      
+      // Use updated_at field as the lastUpdated property
+      mqttData.lastUpdated = mqttData.updated_at || mqttData.created_at;
+      
+      // If current status is online, use this as the last online timestamp too
+      if (mqttData.status === 'Online') {
+        // If we didn't extract lastOnlineTimestamp from status, use lastUpdated
+        if (!mqttData.lastOnlineTimestamp) {
+          mqttData.lastOnlineTimestamp = mqttData.lastUpdated;
+        }
+      }
+    }
+    
+    // If current status is offline, fetch the last online record
+    if (mqttData.status === 'Offline') {
+      try {
+        // Query for the most recent 'Online' status record
+        const lastOnlineResponse = await api.get('/mqtt-status', { 
+          params: { 
+            status: 'Online',  // This might need to be adjusted to match your actual DB
+            limit: 1,
+            sort: 'updated_at,desc' // Get the most recent by updated_at
+          } 
+        });
+        
+        // If we found a last online record, use its timestamp
+        if (lastOnlineResponse.data && lastOnlineResponse.data.length > 0) {
+          const lastOnlineRecord = lastOnlineResponse.data[0];
+          
+          // Check if the status contains an embedded timestamp
+          if (lastOnlineRecord.status && lastOnlineRecord.status.startsWith("Online") && lastOnlineRecord.status.length > 6) {
+            const timestampMatch = lastOnlineRecord.status.match(/Online(.*)/);
+            if (timestampMatch && timestampMatch[1]) {
+              try {
+                // Extract the timestamp part and trim it
+                const timestampPart = timestampMatch[1].trim();
+                
+                // Convert timestamp to the correct format using proper date parsing
+                const parsedDate = new Date(timestampPart);
+                if (!isNaN(parsedDate.getTime())) {
+                  mqttData.lastOnlineTimestamp = parsedDate.toISOString();
+                } else {
+                  // If parsing fails, fall back to the record's timestamp
+                  mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
+                }
+              } catch (e) {
+                console.error("Error parsing embedded timestamp from last online record:", e);
+                mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
+              }
+            } else {
+              mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
+            }
+          } else {
+            mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
+          }
+        }
+      } catch (innerError) {
+        console.error('Error fetching last online MQTT status:', innerError);
+      }
+    }
+    
+    // Ensure the lastOnlineTimestamp is properly formatted
+    if (mqttData.lastOnlineTimestamp) {
+      try {
+        // Make sure it's a valid date
+        const validDate = new Date(mqttData.lastOnlineTimestamp);
+        if (!isNaN(validDate.getTime())) {
+          mqttData.lastOnlineTimestamp = validDate.toISOString();
+        }
+      } catch (e) {
+        console.error("Error formatting last online timestamp:", e);
+      }
+    }
     
     // If online, fetch LAeq to determine signal strength
     if (mqttData.status === 'Online') {
-      const laeqResponse = await api.get('/tbl-laeq', { params: { limit: 1 } });
-      const laeqValue = laeqResponse.data[0]?.laeq || 0;
-      
-      // Logic to determine MQTT signal quality based on LAeq value
-      if (laeqValue > 0 && laeqValue < 45) {
-        mqttData.quality = 'Baik';
-      } else if (laeqValue >= 45 && laeqValue < 55) {
-        mqttData.quality = 'Sedang';
-      } else {
-        mqttData.quality = 'Lemah';
+      try {
+        const laeqResponse = await api.get('/tbl-laeq', { params: { limit: 1 } });
+        const laeqValue = laeqResponse.data?.[0]?.laeq || 0;
+        
+        // Logic to determine MQTT signal quality based on LAeq value
+        if (laeqValue > 0 && laeqValue < 45) {
+          mqttData.quality = 'Baik';
+        } else if (laeqValue >= 45 && laeqValue < 55) {
+          mqttData.quality = 'Sedang';
+        } else {
+          mqttData.quality = 'Lemah';
+        }
+      } catch (qualityError) {
+        console.error('Error determining signal quality:', qualityError);
+        mqttData.quality = 'Unknown';
       }
     } else {
       mqttData.quality = 'Offline';
@@ -191,7 +352,13 @@ export const fetchMqttStatus = async () => {
     return mqttData;
   } catch (error) {
     console.error('Error fetching MQTT status:', error);
-    return { status: 'Offline', quality: 'Offline' };
+    // Include default values on error
+    return { 
+      status: 'Offline', 
+      quality: 'Offline',
+      lastUpdated: new Date().toISOString(),
+      lastOnlineTimestamp: null
+    };
   }
 };
 
@@ -204,6 +371,11 @@ export const fetchTrendData = async (params = {}) => {
         sort: 'created_at,desc'
       } 
     });
+    
+    // If no data, return early
+    if (!realtimeResponse.data || realtimeResponse.data.length === 0) {
+      return [];
+    }
     
     // Fetch LAeq from tbl_laeq
     const laeqResponse = await api.get('/tbl-laeq', { 
@@ -221,12 +393,16 @@ export const fetchTrendData = async (params = {}) => {
       } 
     });
     
-    // Combine data by timestamp (closest match)
+    // Combine data by timestamp (closest match) with proper null checks
     const trendData = realtimeResponse.data.map(rtItem => {
+      if (!rtItem || !rtItem.created_at) return null;
+      
       const rtTimestamp = new Date(rtItem.created_at).getTime();
       
       // Find closest LAeq entry
-      const laeqItem = laeqResponse.data.reduce((closest, item) => {
+      const laeqItem = (laeqResponse.data || []).reduce((closest, item) => {
+        if (!item || !item.created_at) return closest;
+        
         const itemTime = new Date(item.created_at).getTime();
         const closestTime = closest ? new Date(closest.created_at).getTime() : null;
         
@@ -237,7 +413,9 @@ export const fetchTrendData = async (params = {}) => {
       }, null);
       
       // Find closest hourly entry for Lmin/Lmax
-      const hourlyItem = hourlyResponse.data.reduce((closest, item) => {
+      const hourlyItem = (hourlyResponse.data || []).reduce((closest, item) => {
+        if (!item || !item.created_at) return closest;
+        
         const itemTime = new Date(item.created_at).getTime();
         const closestTime = closest ? new Date(closest.created_at).getTime() : null;
         

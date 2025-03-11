@@ -1,60 +1,128 @@
 import React, { useEffect, useRef } from "react";
 import { MapPin } from "lucide-react";
+import MqttStatus from "./MqttStatus";
 
-const MapPanel = ({ currentStatus, currentDateTime, deviceId, location, mqttStatus }) => {
+const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
   const mapRef = useRef(null);
-  const mapInstance = useRef(null); // Simpan referensi peta agar tidak diinisialisasi ulang
-
-  const formattedTime = currentDateTime.toLocaleTimeString("id-ID", {
+  const mapInstance = useRef(null);
+  
+  // Parse and format the last updated timestamp
+  const displayTimestamp = mqttStatus?.lastUpdated 
+    ? new Date(mqttStatus.lastUpdated) 
+    : new Date();
+  
+  // Format time for display (using Indonesian locale format)
+  const formattedTime = displayTimestamp.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit"
+  });
+
+  // Format date for display (using Indonesian locale format)
+  const formattedDate = displayTimestamp.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 
   const latitude = 3.020755;
   const longitude = 101.714141;
 
-  useEffect(() => {
-    // Cek apakah Leaflet sudah dimuat
-    if (!window.L) {
+  // Function to load Leaflet if not already loaded
+  const loadLeaflet = () => {
+    return new Promise((resolve, reject) => {
+      if (window.L) {
+        resolve(window.L);
+        return;
+      }
+
       const leafletScript = document.createElement("script");
       leafletScript.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js";
       leafletScript.crossOrigin = "anonymous";
-      document.head.appendChild(leafletScript);
-
+      
       const leafletCSS = document.createElement("link");
       leafletCSS.rel = "stylesheet";
       leafletCSS.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css";
       leafletCSS.crossOrigin = "anonymous";
+      
       document.head.appendChild(leafletCSS);
+      document.head.appendChild(leafletScript);
+      
+      leafletScript.onload = () => resolve(window.L);
+      leafletScript.onerror = reject;
+    });
+  };
 
-      leafletScript.onload = () => {
-        initMap();
-      };
-    } else {
-      initMap();
-    }
+  // Initialize map
+  const initMap = async () => {
+    // Make sure Leaflet is loaded
+    const L = await loadLeaflet();
     
-    return () => {
-      // Cleanup hanya jika peta telah dibuat
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-      }
-    };
-  }, []);
+    // Always remove previous map instance if it exists
+    if (mapInstance.current) {
+      mapInstance.current.remove();
+      mapInstance.current = null;
+    }
 
-  const initMap = () => {
-    if (!mapRef.current || mapInstance.current) return; // Hindari duplikasi inisialisasi
-
-    const L = window.L;
+    // Check if the ref is available
+    if (!mapRef.current) return;
+    
+    // Create new map
     mapInstance.current = L.map(mapRef.current).setView([latitude, longitude], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
     }).addTo(mapInstance.current);
 
-    const marker = L.marker([latitude, longitude]).addTo(mapInstance.current);
-    marker.bindPopup(`<b>${location}</b><br>Status: ${currentStatus.status}<br>Device ID: ${deviceId}`).openPopup();
+    // Determine status text to display in popup
+let statusText = "Offline";
+
+// If current status is online, show Online
+if (mqttStatus?.status && mqttStatus.status.startsWith("Online")) {
+  statusText = "Online";
+} 
+// If offline and we have lastOnlineTimestamp, show the last online time
+else if (mqttStatus?.lastOnlineTimestamp) {
+  try {
+    // Parse the ISO timestamp into a valid Date object
+    const lastOnlineDate = new Date(mqttStatus.lastOnlineTimestamp);
+    
+    // Check if we got a valid date
+    if (!isNaN(lastOnlineDate.getTime())) {
+      // Format using Indonesian locale
+      const formattedLastOnline = lastOnlineDate.toLocaleString("id-ID");
+      statusText = `Offline (Terakhir Online: ${formattedLastOnline})`;
+    } else {
+      statusText = "Offline";
+    }
+  } catch (e) {
+    console.error("Error formatting lastOnlineTimestamp:", e);
+    statusText = "Offline";
+  }
+}
+
+const marker = L.marker([latitude, longitude]).addTo(mapInstance.current);
+marker.bindPopup(`
+  <b>Lokasi: ${latitude}, ${longitude}</b><br>
+  Status: ${statusText}<br>
+  Device ID: ${deviceId}
+`).openPopup();
   };
+
+  useEffect(() => {
+    // Initialize map when component mounts
+    if (mapRef.current) {
+      initMap();
+    }
+    
+    // Cleanup function to remove map when component unmounts
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, [deviceId, mqttStatus]); // Re-initialize map when these props change
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
@@ -67,21 +135,27 @@ const MapPanel = ({ currentStatus, currentDateTime, deviceId, location, mqttStat
         <div ref={mapRef} className="h-64 lg:col-span-2"></div>
         
         <div className="p-4 flex flex-col justify-center space-y-4">
-          <div className="flex items-center">
-            <div className={`w-3 h-3 rounded-full ${currentStatus.color} mr-2`}></div>
-            <span className="font-semibold">Status</span>
-            <span className="ml-auto">{currentStatus.status}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`w-3 h-3 rounded-full ${mqttStatus?.status === "Online" ? "bg-green-500" : "bg-red-500"} mr-2`}></div>
+              <span className="font-semibold">Status</span>
+            </div>
+            <MqttStatus status={mqttStatus} />
           </div>
           
-          <div className="flex items-center">
-            <mqttStatus.icon className={`${mqttStatus.color} mr-2`} size={16} />
-            <span className="font-semibold">Terakhir Update</span>
-            <span className="ml-auto">{formattedTime}</span>
+          <div className="flex flex-col space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">Terakhir Update</span>
+              <span>{formattedTime}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">Tanggal Update</span>
+              <span>{formattedDate}</span>
+            </div>
           </div>
-          
-          <div className="flex items-center">
+          <div className="flex items-center justify-between">
             <span className="font-semibold">Device ID</span>
-            <span className="ml-auto">{deviceId}</span>
+            <span>{deviceId}</span>
           </div>
         </div>
       </div>

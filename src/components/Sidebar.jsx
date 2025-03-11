@@ -78,7 +78,7 @@ const Sidebar = ({
             <div className="h-8 w-8 bg-gradient-to-br from-green-400 to-blue-500 rounded-md flex items-center justify-center">
               <Volume2 size={18} className="text-white" />
             </div>
-            <span className="ml-2 font-bold text-white">EcoSound</span>
+            <span className="ml-2 font-bold text-white">OtoSense</span>
           </div>
         )}
         <button
