@@ -94,7 +94,7 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
     mapInstance.current = L.map(mapRef.current).setView([latitude, longitude], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
+      attribution: 'Â© OpenStreetMap contributors',
     }).addTo(mapInstance.current);
 
     // Determine status text to display in popup
