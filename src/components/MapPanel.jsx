@@ -6,24 +6,47 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   
-  // Parse and format the last updated timestamp
-  const displayTimestamp = mqttStatus?.lastUpdated 
+  // Get the last updated timestamp
+  const lastUpdatedTimestamp = mqttStatus?.lastUpdated 
     ? new Date(mqttStatus.lastUpdated) 
     : new Date();
   
+  // Get the last online timestamp (if status is offline)
+  const lastOnlineTimestamp = mqttStatus?.lastOnlineTimestamp
+    ? new Date(mqttStatus.lastOnlineTimestamp)
+    : null;
+  
   // Format time for display (using Indonesian locale format)
-  const formattedTime = displayTimestamp.toLocaleTimeString("id-ID", {
+  const formattedTime = lastUpdatedTimestamp.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
   });
 
   // Format date for display (using Indonesian locale format)
-  const formattedDate = displayTimestamp.toLocaleDateString("id-ID", {
+  const formattedDate = lastUpdatedTimestamp.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
+
+  // Format last online time if available (for offline status)
+  const formattedLastOnlineTime = lastOnlineTimestamp
+    ? lastOnlineTimestamp.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      })
+    : "N/A";
+
+  // Format last online date if available (for offline status)
+  const formattedLastOnlineDate = lastOnlineTimestamp
+    ? lastOnlineTimestamp.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "N/A";
 
   const latitude = 3.020755;
   const longitude = 101.714141;
@@ -71,42 +94,34 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
     mapInstance.current = L.map(mapRef.current).setView([latitude, longitude], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
+      attribution: 'Â© OpenStreetMap contributors',
     }).addTo(mapInstance.current);
 
     // Determine status text to display in popup
-let statusText = "Offline";
+    let statusText = "Offline";
 
-// If current status is online, show Online
-if (mqttStatus?.status && mqttStatus.status.startsWith("Online")) {
-  statusText = "Online";
-} 
-// If offline and we have lastOnlineTimestamp, show the last online time
-else if (mqttStatus?.lastOnlineTimestamp) {
-  try {
-    // Parse the ISO timestamp into a valid Date object
-    const lastOnlineDate = new Date(mqttStatus.lastOnlineTimestamp);
-    
-    // Check if we got a valid date
-    if (!isNaN(lastOnlineDate.getTime())) {
-      // Format using Indonesian locale
-      const formattedLastOnline = lastOnlineDate.toLocaleString("id-ID");
-      statusText = `Offline (Terakhir Online: ${formattedLastOnline})`;
-    } else {
-      statusText = "Offline";
+    // If current status is online, show Online
+    if (mqttStatus?.status === "Online") {
+      statusText = "Online";
+    } 
+    // If offline and we have lastOnlineTimestamp, show the last online time
+    else if (mqttStatus?.lastOnlineTimestamp) {
+      try {
+        // Format using Indonesian locale
+        const formattedLastOnline = `${formattedLastOnlineDate} ${formattedLastOnlineTime}`;
+        statusText = `Offline (Terakhir Online: ${formattedLastOnline})`;
+      } catch (e) {
+        console.error("Error formatting lastOnlineTimestamp:", e);
+        statusText = "Offline";
+      }
     }
-  } catch (e) {
-    console.error("Error formatting lastOnlineTimestamp:", e);
-    statusText = "Offline";
-  }
-}
 
-const marker = L.marker([latitude, longitude]).addTo(mapInstance.current);
-marker.bindPopup(`
-  <b>Lokasi: ${latitude}, ${longitude}</b><br>
-  Status: ${statusText}<br>
-  Device ID: ${deviceId}
-`).openPopup();
+    const marker = L.marker([latitude, longitude]).addTo(mapInstance.current);
+    marker.bindPopup(`
+      <b>Lokasi: ${latitude}, ${longitude}</b><br>
+      Status: ${statusText}<br>
+      Device ID: ${deviceId}
+    `).openPopup();
   };
 
   useEffect(() => {
@@ -124,6 +139,14 @@ marker.bindPopup(`
     };
   }, [deviceId, mqttStatus]); // Re-initialize map when these props change
 
+  // Determine what to show in the right panel
+  const showLastOnlineInfo = mqttStatus?.status === "Offline" && lastOnlineTimestamp;
+
+  // CSS classes for status indicator
+  const statusIndicatorClass = mqttStatus?.status === "Online" 
+    ? "w-3 h-3 rounded-full bg-green-500 mr-2 animate-pulse shadow-lg shadow-green-500/50" 
+    : "w-3 h-3 rounded-full bg-red-500 mr-2";
+
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
       <div className="p-4 bg-gray-700 font-semibold flex items-center">
@@ -137,21 +160,26 @@ marker.bindPopup(`
         <div className="p-4 flex flex-col justify-center space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full ${mqttStatus?.status === "Online" ? "bg-green-500" : "bg-red-500"} mr-2`}></div>
+              <div className={statusIndicatorClass}></div>
               <span className="font-semibold">Status</span>
             </div>
             <MqttStatus status={mqttStatus} />
           </div>
           
-          <div className="flex flex-col space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">Terakhir Update</span>
-              <span>{formattedTime}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">Tanggal Update</span>
-              <span>{formattedDate}</span>
-            </div>
+          <div className="flex flex-col space-y-2">          
+            {/* Show last online time if status is offline */}
+            {showLastOnlineInfo && (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Terakhir Online</span>
+                  <span>{formattedLastOnlineTime}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Tanggal Online</span>
+                  <span>{formattedLastOnlineDate}</span>
+                </div>
+              </>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <span className="font-semibold">Device ID</span>

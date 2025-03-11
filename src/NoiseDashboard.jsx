@@ -473,6 +473,7 @@ const NoiseDashboard = () => {
           activeSection={activeSidebarSection}
           onSectionChange={handleSectionChange}
         />
+  
         {/* Main content */}
         <div className="flex-1 flex flex-col overflow-auto">
           <Header
@@ -480,8 +481,9 @@ const NoiseDashboard = () => {
             formattedTime={formattedTime}
             mqttStatus={mqttStatusDisplay}
           />
+  
           {/* Dashboard content */}
-          <div className="p-6 overflow-auto">
+          <div className="p-6 flex-1">
             <div className="lg:col-span-1 mb-6">
               <MapPanel
                 currentStatus={currentStatus}
@@ -491,12 +493,14 @@ const NoiseDashboard = () => {
                   text: mqttStatusDisplay.text,
                   color: mqttStatusDisplay.color,
                   icon: mqttStatusDisplay.icon,
+                  // Ensure we have the correct timestamp properties
                   lastUpdated:
                     mqttStatus.lastUpdated ||
                     mqttStatus.updated_at ||
                     new Date().toISOString(),
                   lastOnlineTimestamp:
                     mqttStatus.lastOnlineTimestamp || mqttStatus.lastUpdated,
+                  // Make sure status is properly parsed from combined string if needed
                   status:
                     mqttStatus.status && mqttStatus.status.startsWith("Online")
                       ? "Online"
@@ -582,13 +586,13 @@ const NoiseDashboard = () => {
               />
             </div>
           </div>
-          
-          {/* Footer */}
+  
+          {/* Non-sticky Footer */}
           <Footer />
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default NoiseDashboard;

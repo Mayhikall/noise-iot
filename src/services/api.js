@@ -226,31 +226,8 @@ export const fetchMqttStatus = async () => {
     if (response.data && response.data.length > 0) {
       mqttData = response.data[0];
       
-      // Parse combined status if necessary (e.g., "Online2025-03-03 11:51:53")
+      // Clean up status if necessary (e.g., "Online2025-03-03 11:51:53")
       if (mqttData.status && mqttData.status.startsWith("Online")) {
-        // Extract timestamp from status if it's embedded
-        if (mqttData.status.length > 6) { // "Online" + something else
-          const timestampMatch = mqttData.status.match(/Online(.*)/);
-          if (timestampMatch && timestampMatch[1]) {
-            try {
-              // Extract the timestamp part and trim it
-              const timestampPart = timestampMatch[1].trim();
-              // Store the original timestamp
-              mqttData.statusTimestamp = timestampPart;
-              
-              // Convert timestamp to the correct format using proper date parsing
-              // This properly handles various date formats that might be in the database
-              const parsedDate = new Date(timestampPart);
-              if (!isNaN(parsedDate.getTime())) {
-                mqttData.lastOnlineTimestamp = parsedDate.toISOString();
-              }
-            } catch (e) {
-              console.error("Error parsing embedded timestamp:", e);
-            }
-          }
-        }
-        
-        // Set clean status regardless of timestamp extraction success
         mqttData.status = "Online";
       }
       
@@ -259,10 +236,7 @@ export const fetchMqttStatus = async () => {
       
       // If current status is online, use this as the last online timestamp too
       if (mqttData.status === 'Online') {
-        // If we didn't extract lastOnlineTimestamp from status, use lastUpdated
-        if (!mqttData.lastOnlineTimestamp) {
-          mqttData.lastOnlineTimestamp = mqttData.lastUpdated;
-        }
+        mqttData.lastOnlineTimestamp = mqttData.lastUpdated;
       }
     }
     
@@ -272,7 +246,7 @@ export const fetchMqttStatus = async () => {
         // Query for the most recent 'Online' status record
         const lastOnlineResponse = await api.get('/mqtt-status', { 
           params: { 
-            status: 'Online',  // This might need to be adjusted to match your actual DB
+            status: 'Online',  // This needs to match the exact column values in DB
             limit: 1,
             sort: 'updated_at,desc' // Get the most recent by updated_at
           } 
@@ -281,33 +255,7 @@ export const fetchMqttStatus = async () => {
         // If we found a last online record, use its timestamp
         if (lastOnlineResponse.data && lastOnlineResponse.data.length > 0) {
           const lastOnlineRecord = lastOnlineResponse.data[0];
-          
-          // Check if the status contains an embedded timestamp
-          if (lastOnlineRecord.status && lastOnlineRecord.status.startsWith("Online") && lastOnlineRecord.status.length > 6) {
-            const timestampMatch = lastOnlineRecord.status.match(/Online(.*)/);
-            if (timestampMatch && timestampMatch[1]) {
-              try {
-                // Extract the timestamp part and trim it
-                const timestampPart = timestampMatch[1].trim();
-                
-                // Convert timestamp to the correct format using proper date parsing
-                const parsedDate = new Date(timestampPart);
-                if (!isNaN(parsedDate.getTime())) {
-                  mqttData.lastOnlineTimestamp = parsedDate.toISOString();
-                } else {
-                  // If parsing fails, fall back to the record's timestamp
-                  mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
-                }
-              } catch (e) {
-                console.error("Error parsing embedded timestamp from last online record:", e);
-                mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
-              }
-            } else {
-              mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
-            }
-          } else {
-            mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
-          }
+          mqttData.lastOnlineTimestamp = lastOnlineRecord.updated_at || lastOnlineRecord.created_at;
         }
       } catch (innerError) {
         console.error('Error fetching last online MQTT status:', innerError);
