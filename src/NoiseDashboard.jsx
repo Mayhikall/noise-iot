@@ -78,18 +78,34 @@ const NoiseDashboard = () => {
   const formatTrendData = (data) => {
     if (!data || !Array.isArray(data)) return [];
 
-    return data.map((item) => ({
-      time: new Date(item.created_at).toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      value: item.laeq || 0,
-      l10: item.L10 || 0,
-      l50: item.L50 || 0,
-      l90: item.L90 || 0,
-      lmin: item.Lmin || 0,
-      lmax: item.Lmax || 0,
-    }));
+    return data.map((item) => {
+      // Check if the item already has a time property
+      if (item.time) {
+        return {
+          ...item,
+          value: item.value || item.laeq || item.laeq1h || 0,
+          l10: item.L10 || item.l10 || 0,
+          l50: item.L50 || item.l50 || 0,
+          l90: item.L90 || item.l90 || 0,
+          lmin: item.Lmin || item.lmin || 0,
+          lmax: item.Lmax || item.lmax || 0,
+        };
+      }
+
+      // Otherwise, create the time property from created_at
+      return {
+        time: new Date(item.created_at).toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        value: item.laeq || item.laeq1h || 0,
+        l10: item.L10 || 0,
+        l50: item.L50 || 0,
+        l90: item.L90 || 0,
+        lmin: item.Lmin || 0,
+        lmax: item.Lmax || 0,
+      };
+    });
   };
 
   // Status Determination Function
@@ -102,7 +118,7 @@ const NoiseDashboard = () => {
         description: "Hening, hampir tidak ada suara",
       };
     }
-  
+
     if (noiseLevel <= 20) {
       return {
         status: "Quiet",
@@ -111,7 +127,7 @@ const NoiseDashboard = () => {
         description: "Suara sangat pelan",
       };
     }
-  
+
     if (noiseLevel <= 40) {
       return {
         status: "Whispered",
@@ -120,7 +136,7 @@ const NoiseDashboard = () => {
         description: "Berbisik, sangat tenang",
       };
     }
-  
+
     if (noiseLevel <= 60) {
       return {
         status: "Normal",
@@ -129,7 +145,7 @@ const NoiseDashboard = () => {
         description: "Percakapan normal",
       };
     }
-  
+
     if (noiseLevel <= 90) {
       return {
         status: "High",
@@ -138,7 +154,7 @@ const NoiseDashboard = () => {
         description: "Mulai merusak pendengaran",
       };
     }
-  
+
     if (noiseLevel <= 100) {
       return {
         status: "Very High",
@@ -147,7 +163,7 @@ const NoiseDashboard = () => {
         description: "Kehilangan pendengaran bisa terjadi",
       };
     }
-  
+
     return {
       status: "Extreme",
       color: "bg-red-700",
@@ -155,7 +171,7 @@ const NoiseDashboard = () => {
       description: "Bahaya! Kerusakan pendengaran serius",
     };
   };
-  
+
   // MQTT Status Icon and Color
   const getMqttStatusDisplay = () => {
     if (!mqttStatus || mqttStatus.status === "Offline") {
@@ -275,10 +291,9 @@ const NoiseDashboard = () => {
   // Fetch minute data
   const fetchMinuteData = async () => {
     try {
-      const response = await fetchLaeqMinuteData({ limit: 60 });
-      const minuteData = formatTrendData(response);
-      setMinuteData(minuteData);
-      console.log("Minute data loaded:", minuteData);
+      const response = await fetchLaeqMinuteData();
+      setMinuteData(response);
+      console.log("Minute data loaded:", response);
     } catch (err) {
       console.error("Error loading minute data:", err);
     }
@@ -288,9 +303,9 @@ const NoiseDashboard = () => {
   const fetchHourlyData = async () => {
     try {
       const response = await fetchLaeqHourlyData({ limit: 24 });
-      const hourlyData = formatTrendData(response);
-      setHourlyData(hourlyData);
-      console.log("Hourly data loaded:", hourlyData);
+      // No need to format data as it's already formatted in the API service
+      setHourlyData(response);
+      console.log("Hourly data loaded:", response);
     } catch (err) {
       console.error("Error loading hourly data:", err);
     }
@@ -300,7 +315,7 @@ const NoiseDashboard = () => {
   const fetchReportData = async () => {
     try {
       const response = await fetchRealtimeData({
-        limit: 10,
+        // limit: 3000,
         timeRange: reportTimeRange,
       });
 
@@ -416,6 +431,9 @@ const NoiseDashboard = () => {
 
   // Update minute data every 5 minutes
   useEffect(() => {
+    // Initial load
+    fetchMinuteData();
+
     const timer = setInterval(() => {
       fetchMinuteData();
     }, 300000); // 5 minutes
@@ -431,6 +449,11 @@ const NoiseDashboard = () => {
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(fetchReportData, 30000); // Update every 30 secondshData, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, [reportTimeRange]);
 
   if (loading) {
     return (
@@ -473,7 +496,7 @@ const NoiseDashboard = () => {
           activeSection={activeSidebarSection}
           onSectionChange={handleSectionChange}
         />
-  
+
         {/* Main content */}
         <div className="flex-1 flex flex-col overflow-auto">
           <Header
@@ -481,7 +504,7 @@ const NoiseDashboard = () => {
             formattedTime={formattedTime}
             mqttStatus={mqttStatusDisplay}
           />
-  
+
           {/* Dashboard content */}
           <div className="p-6 flex-1">
             <div className="lg:col-span-1 mb-6">
@@ -508,7 +531,7 @@ const NoiseDashboard = () => {
                 }}
               />
             </div>
-  
+
             {/* Summary Cards */}
             <div className="lg:col-span-3">
               <SummaryCardsRow
@@ -518,7 +541,7 @@ const NoiseDashboard = () => {
                 currentL90={currentL90}
                 currentStatus={currentStatus}
               />
-  
+
               <div className="mt-6">
                 <SecondaryCardsRow
                   currentLMin={currentLMin}
@@ -527,7 +550,7 @@ const NoiseDashboard = () => {
                 />
               </div>
             </div>
-  
+
             {/* Charts Section */}
             <div className="mb-6">
               <TrendChart
@@ -535,29 +558,29 @@ const NoiseDashboard = () => {
                 timeFilter={timeFilter}
                 onTimeFilterChange={setTimeFilter}
               />
-  
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                <MinuteChart data={minuteData} />
-                <HourlyChart data={hourlyData} />
-              </div>
+
+              <MinuteChart data={minuteData} />
+              <HourlyChart data={hourlyData} />
             </div>
-  
+
             {/* Report Section */}
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Data Laporan</h2>
-  
+
                 <div className="flex space-x-2">
                   {/* Time Range Selector */}
                   <select
                     value={reportTimeRange}
-                    onChange={(e) => handleReportTimeRangeChange(e.target.value)}
+                    onChange={(e) =>
+                      handleReportTimeRangeChange(e.target.value)
+                    }
                     className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
                   >
                     <option value="15minutes">15 Menit</option>
                     <option value="1hour">1 Jam</option>
                   </select>
-  
+
                   {/* Export Buttons */}
                   <button
                     onClick={() => handleExportReport("excel")}
@@ -567,7 +590,7 @@ const NoiseDashboard = () => {
                     <FileText size={16} />
                     <span>Excel</span>
                   </button>
-  
+
                   <button
                     onClick={() => handleExportReport("pdf")}
                     disabled={exportLoading}
@@ -578,15 +601,16 @@ const NoiseDashboard = () => {
                   </button>
                 </div>
               </div>
-  
+
               <ReportTable
                 reportData={reportData}
-                currentDateTime={currentDateTime}
+                currentDateTime={currentDateTime.toLocaleString("id-ID")}
                 timeRange={reportTimeRange}
+                fetchMoreData={fetchReportData}
               />
             </div>
           </div>
-  
+
           {/* Non-sticky Footer */}
           <Footer />
         </div>
