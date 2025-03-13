@@ -1,74 +1,164 @@
 import React from "react";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 
 const HourlyChart = ({ data }) => {
+  // Urutkan data berdasarkan waktu sebenarnya (created_at)
+  const sortedData = React.useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    // Buat salinan data untuk menghindari mutasi data asli
+    return [...data].sort((a, b) => {
+      // Gunakan created_at untuk pengurutan yang tepat
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      return timeA - timeB; // Urutkan dari yang paling awal ke yang terbaru
+    });
+  }, [data]);
+  
   // Determine dynamic domain based on actual data values
   const getYDomain = () => {
-    if (!data || data.length === 0) return [40, 85];
+    if (!sortedData || sortedData.length === 0) return [40, 85];
     
-    const values = data.map(item => item.value);
-    const minValue = Math.floor(Math.min(...values, 40));
-    const maxValue = Math.ceil(Math.max(...values, 85));
+    const values = sortedData.map((item) => item.value);
+    const validValues = values.filter(val => val > 0);
+    
+    if (validValues.length === 0) return [40, 85];
+    
+    const minValue = Math.floor(Math.min(...validValues));
+    const maxValue = Math.ceil(Math.max(...validValues));
     
     return [Math.max(0, minValue - 5), maxValue + 5];
   };
 
+  // Format waktu untuk tampilan pada sumbu X
+  const formatTime = (time) => {
+    if (!time) return '';
+    // Pastikan format waktu konsisten
+    const timeParts = time.split(':');
+    if (timeParts.length >= 2) {
+      return `${timeParts[0]}:${timeParts[1]}`; // Format "HH:MM"
+    }
+    return time;
+  };
+
+  // Custom tooltip formatter
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip bg-gray-800 p-3 border border-gray-600 rounded shadow-lg text-left">
+          <p className="text-blue-300 font-medium mb-1">{`Waktu: ${label}`}</p>
+          {payload.map((entry, index) => (
+            <div key={`item-${index}`} className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: entry.color }}
+              ></div>
+              <p className="text-gray-200">
+                <span>{entry.name}: </span>
+                <span className="text-white font-medium">
+                  {typeof entry.value === "number" ? entry.value.toFixed(1) : entry.value} dB
+                </span>
+              </p>
+            </div>
+          ))}
+          {payload.length > 0 && payload[0].payload && (
+            <>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <p className="text-gray-200">
+                  <span>L-max: </span>
+                  <span className="text-white font-medium">
+                    {payload[0].payload.lmax?.toFixed(1) || 0} dB
+                  </span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <p className="text-gray-200">
+                  <span>L-min: </span>
+                  <span className="text-white font-medium">
+                    {payload[0].payload.lmin?.toFixed(1) || 0} dB
+                  </span>
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Custom legend component
+  const CustomLegend = (props) => {
+    const { payload } = props;
+    
+    return (
+      <div className="flex justify-center items-center mt-2 mb-4">
+        {payload.map((entry, index) => (
+          <div key={`legend-${index}`} className="flex items-center mx-4">
+            <div
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: entry.color }}
+            ></div>
+            <span className="text-gray-200 text-sm">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700">
+    <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
       <div className="p-4 border-b border-gray-700">
         <h3 className="text-blue-300 text-sm font-medium">Tren LAeq Per Jam</h3>
       </div>
       <div className="p-4 h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart 
-            data={data}
+          <BarChart
+            data={sortedData}
             margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+            barGap={0}
+            barCategoryGap="20%"
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="time" 
-              stroke="#9CA3AF" 
-              tick={{ fontSize: 10 }}
-              tickFormatter={(value) => value.split(':')[0] + 'h'}
-            />
-            <YAxis 
-              domain={getYDomain()} 
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
+            <XAxis
+              dataKey="time"
               stroke="#9CA3AF"
+              tick={{ fontSize: 10, fill: "#9CA3AF" }}
+              tickFormatter={formatTime}
+            />
+            <YAxis
+              domain={getYDomain()}
+              stroke="#9CA3AF"
+              tick={{ fontSize: 10, fill: "#9CA3AF" }}
               tickFormatter={(value) => `${value} dB`}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
-                color: "#F3F4F6",
-                borderRadius: "4px",
-              }}
-              labelStyle={{ color: "#F3F4F6" }}
-              formatter={(value) => [`${value.toFixed(1)} dB`, "LAeq"]}
-              labelFormatter={(label) => `Waktu: ${label}`}
+            <Tooltip 
+              content={<CustomTooltip />} 
+              cursor={{ opacity: 0.3, fill: "#4B5563" }}
+              wrapperStyle={{ outline: "none" }}
             />
-            <Legend verticalAlign="top" height={36} />
-            <Line
-              type="monotone"
+            <Legend content={<CustomLegend />} />
+            <Bar
               dataKey="value"
-              stroke="#10B981"
-              strokeWidth={2}
-              dot={{ r: 1, strokeWidth: 2 }}
-              activeDot={{ r: 5, stroke: "#10B981", strokeWidth: 1 }}
-              name="LAeq (dB)"
-              isAnimationActive={true}
+              fill="#10B981"
+              name="LAeq (Per Jam)"
               animationDuration={1000}
+              radius={[2, 2, 0, 0]}
+              activeBar={{ fill: "#34D399", stroke: "#059669", strokeWidth: 2 }}
             />
-          </LineChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>

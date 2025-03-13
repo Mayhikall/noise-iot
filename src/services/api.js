@@ -103,10 +103,32 @@ export const fetchLaeqData = async (params = {}) => {
 export const fetchLaeqMinuteData = async (params = {}) => {
   try {
     // Fetch from laeq_data for Minute LAeq
+    // Ensure we request 60 data points (1 hour of minute data)
     const response = await api.get('/laeq-data', { 
-      params: { ...params, type: '1min' } 
+      params: { 
+        ...params, 
+        type: '1m',
+        limit: 60, // Explicitly request 60 minutes of data 
+        sort: 'created_at,desc' // Get most recent data first
+      } 
     });
-    return response.data || [];
+    
+    if (!response.data || !Array.isArray(response.data)) {
+      return [];
+    }
+    
+    // Format the data for the chart
+    const formattedData = response.data.map(item => ({
+      time: new Date(item.created_at).toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      value: item.value || 0,
+      created_at: item.created_at
+    }));
+    
+    // Reverse to show chronological order for the chart
+    return formattedData.reverse() || [];
   } catch (error) {
     console.error('Error fetching LAeq minute data:', error);
     return [];
@@ -117,7 +139,20 @@ export const fetchLaeqHourlyData = async (params = {}) => {
   try {
     // Fetch from laeq_hourly for Hourly LAeq
     const response = await api.get('/laeq-hourly', { params });
-    return response.data || [];
+    
+    // Map the data to the format expected by the component
+    const formattedData = response.data.map(item => ({
+      time: new Date(item.created_at).toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      value: item.laeq1h || 0,
+      lmax: item.Lmax || 0,
+      lmin: item.Lmin || 0,
+      created_at: item.created_at
+    }));
+    
+    return formattedData || [];
   } catch (error) {
     console.error('Error fetching LAeq hourly data:', error);
     return [];
@@ -126,81 +161,25 @@ export const fetchLaeqHourlyData = async (params = {}) => {
 
 export const fetchRealtimeData = async (params = {}) => {
   try {
-    // Fetch from laeq_realtime for L10, L50, L90
-    const realtimeResponse = await api.get('/laeq-realtime', { 
-      params: { 
-        ...params, 
-        sort: 'created_at,desc' 
-      } 
+    const { timeRange, ...otherParams } = params;
+    const now = new Date();
+    const timeAgo = new Date(now.getTime() - (timeRange === "15minutes" ? 15 * 60 * 1000 : 60 * 60 * 1000));
+
+    const response = await api.get('/laeq-realtime', {
+      params: {
+        ...otherParams,
+        created_at: { $gte: timeAgo.toISOString() },
+        sort: 'created_at,desc',
+      },
     });
-    
-    // If no data, return early
-    if (!realtimeResponse.data || realtimeResponse.data.length === 0) {
-      return [];
-    }
-    
-    // Fetch corresponding LAeq data from tbl_laeq
-    const laeqResponse = await api.get('/tbl-laeq', { 
-      params: { 
-        limit: params.limit || 10,
-        sort: 'created_at,desc'
-      } 
-    });
-    
-    // Fetch Lmin, Lmax from laeq_hourly
-    const hourlyResponse = await api.get('/laeq-hourly', { 
-      params: { 
-        limit: params.limit || 10,
-        sort: 'created_at,desc'
-      } 
-    });
-    
-    // Combine data by timestamp (closest match)
-    const combinedData = realtimeResponse.data.map(rtItem => {
-      if (!rtItem || !rtItem.created_at) return null;
-      
-      const rtTimestamp = new Date(rtItem.created_at).getTime();
-      
-      // Find closest LAeq entry
-      const laeqItem = (laeqResponse.data || []).reduce((closest, item) => {
-        if (!item || !item.created_at) return closest;
-        
-        const itemTime = new Date(item.created_at).getTime();
-        const closestTime = closest ? new Date(closest.created_at).getTime() : null;
-        
-        if (!closest || Math.abs(itemTime - rtTimestamp) < Math.abs(closestTime - rtTimestamp)) {
-          return item;
-        }
-        return closest;
-      }, null);
-      
-      // Find closest hourly entry
-      const hourlyItem = (hourlyResponse.data || []).reduce((closest, item) => {
-        if (!item || !item.created_at) return closest;
-        
-        const itemTime = new Date(item.created_at).getTime();
-        const closestTime = closest ? new Date(closest.created_at).getTime() : null;
-        
-        if (!closest || Math.abs(itemTime - rtTimestamp) < Math.abs(closestTime - rtTimestamp)) {
-          return item;
-        }
-        return closest;
-      }, null);
-      
-      return {
-        ...rtItem,
-        laeq: laeqItem?.laeq || 0,
-        Lmin: hourlyItem?.Lmin || 0,
-        Lmax: hourlyItem?.Lmax || 0,
-      };
-    }).filter(Boolean); // Remove any null entries
-    
-    return combinedData;
+
+    return response.data || [];
   } catch (error) {
-    console.error('Error fetching realtime data:', error);
+    console.error('Error fetching real-time data:', error);
     return [];
   }
 };
+
 
 export const fetchMqttStatus = async () => {
   try {
