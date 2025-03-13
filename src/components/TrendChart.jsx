@@ -52,7 +52,7 @@ const TrendChart = ({ data, timeFilter, onTimeFilterChange }) => {
       item.l90,
       item.lmin,
       item.lmax
-    ]).filter(val => typeof val === 'number' && !isNaN(val));
+    ]).filter(val => typeof val === 'number' && !isNaN(val) && val > 0);
     
     if (allValues.length === 0) return [35, 65]; // Default if no valid values
     
@@ -63,7 +63,7 @@ const TrendChart = ({ data, timeFilter, onTimeFilterChange }) => {
     const yMin = Math.floor((minValue - 5) / 5) * 5;
     const yMax = Math.ceil((maxValue + 5) / 5) * 5;
     
-    return [Math.max(yMin, 30), Math.min(yMax, 90)]; // Ensure reasonable bounds
+    return [Math.max(yMin, 0), Math.min(yMax, 90)]; // Ensure reasonable bounds
   };
 
   // Get dynamic Y-axis domain
@@ -83,7 +83,7 @@ const TrendChart = ({ data, timeFilter, onTimeFilterChange }) => {
               }`}
             onClick={() => onTimeFilterChange("daytime")}
           >
-            Siang (07:00 - 19:00)
+            Pagi (07:00 - 18:00)
           </button>
           <button
             className={`px-3 py-1 rounded-md text-xs font-medium shadow-md 
@@ -94,7 +94,7 @@ const TrendChart = ({ data, timeFilter, onTimeFilterChange }) => {
               }`}
             onClick={() => onTimeFilterChange("nighttime")}
           >
-            Malam (19:00 - 07:00)
+            Malam (19:00 - 06:00)
           </button>
         </div>
       </div>

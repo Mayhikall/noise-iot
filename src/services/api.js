@@ -312,82 +312,195 @@ export const fetchMqttStatus = async () => {
 
 export const fetchTrendData = async (params = {}) => {
   try {
-    // Fetch realtime data with all required fields
-    const realtimeResponse = await api.get('/laeq-realtime', { 
-      params: { 
-        ...params,
-        sort: 'created_at,desc'
-      } 
-    });
+    const { timeFilter = 'daytime', limit = 12 } = params;
     
-    // If no data, return early
-    if (!realtimeResponse.data || realtimeResponse.data.length === 0) {
-      return [];
+    // Determine time range based on filter
+    let startHour, endHour;
+    
+    if (timeFilter === 'daytime') {
+      startHour = 7;  // 07:00
+      endHour = 19;   // 19:00 (7pm)
+    } else {
+      startHour = 19; // 19:00 (7pm)
+      endHour = 7;    // 07:00 (next day)
     }
     
-    // Fetch LAeq from tbl_laeq
-    const laeqResponse = await api.get('/tbl-laeq', { 
-      params: { 
-        limit: params.limit || 60,
-        sort: 'created_at,desc'
-      } 
+    // Get the current date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Build query parameters for hourly data
+    const queryParams = {
+      limit: 24, // Get full day of data to have all possible hours
+      sort: 'created_at,asc'
+    };
+    
+    // Fetch all required data in parallel
+    const [laeqResponse, realtimeResponse, hourlyResponse] = await Promise.all([
+      // Fetch LAeq from tbl_laeq (hourly aggregated)
+      api.get('/tbl-laeq', { params: queryParams }),
+      
+      // Fetch L10, L50, L90 from laeq_realtime (hourly aggregated)
+      api.get('/laeq-realtime', { params: queryParams }),
+      
+      // Fetch Lmin, Lmax from laeq_hourly
+      api.get('/laeq-hourly', { params: queryParams })
+    ]);
+    
+    // Initialize map to store hourly data
+    const hourlyDataMap = new Map();
+    
+    // Determine which hours to include based on time filter
+    const hoursToInclude = [];
+    
+    if (timeFilter === 'daytime') {
+      // For daytime: 7am to 6pm (7, 8, 9, ..., 18)
+      for (let i = startHour; i < endHour; i++) {
+        hoursToInclude.push(i);
+      }
+    } else {
+      // For nighttime: 7pm to 6am (19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6)
+      for (let i = startHour; i < 24; i++) {
+        hoursToInclude.push(i);
+      }
+      for (let i = 0; i < endHour; i++) {
+        hoursToInclude.push(i);
+      }
+    }
+    
+    // Initialize with slots for each hour in our range
+    hoursToInclude.forEach(hour => {
+      const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+      
+      hourlyDataMap.set(timeStr, {
+        time: timeStr,
+        value: null, // LAeq
+        l10: null,
+        l50: null,
+        l90: null,
+        lmin: null,
+        lmax: null,
+        hour: hour
+      });
     });
     
-    // Fetch Lmin, Lmax from laeq_hourly (closest hourly data)
-    const hourlyResponse = await api.get('/laeq-hourly', { 
-      params: { 
-        limit: 24, // Get 24 hours of data to match with timestamps
-        sort: 'created_at,desc'
-      } 
-    });
-    
-    // Combine data by timestamp (closest match) with proper null checks
-    const trendData = realtimeResponse.data.map(rtItem => {
-      if (!rtItem || !rtItem.created_at) return null;
-      
-      const rtTimestamp = new Date(rtItem.created_at).getTime();
-      
-      // Find closest LAeq entry
-      const laeqItem = (laeqResponse.data || []).reduce((closest, item) => {
-        if (!item || !item.created_at) return closest;
+    // Process LAeq data from tbl_laeq
+    if (laeqResponse.data && Array.isArray(laeqResponse.data)) {
+      laeqResponse.data.forEach(item => {
+        if (!item || !item.created_at) return;
         
-        const itemTime = new Date(item.created_at).getTime();
-        const closestTime = closest ? new Date(closest.created_at).getTime() : null;
+        const date = new Date(item.created_at);
+        const hour = date.getHours();
+        const timeKey = `${hour.toString().padStart(2, '0')}:00`;
         
-        if (!closest || Math.abs(itemTime - rtTimestamp) < Math.abs(closestTime - rtTimestamp)) {
-          return item;
+        // Check if this hour is in our target range
+        if (hourlyDataMap.has(timeKey)) {
+          const existingData = hourlyDataMap.get(timeKey);
+          hourlyDataMap.set(timeKey, {
+            ...existingData,
+            value: parseFloat(item.laeq) || 0
+          });
         }
-        return closest;
-      }, null);
-      
-      // Find closest hourly entry for Lmin/Lmax
-      const hourlyItem = (hourlyResponse.data || []).reduce((closest, item) => {
-        if (!item || !item.created_at) return closest;
-        
-        const itemTime = new Date(item.created_at).getTime();
-        const closestTime = closest ? new Date(closest.created_at).getTime() : null;
-        
-        if (!closest || Math.abs(itemTime - rtTimestamp) < Math.abs(closestTime - rtTimestamp)) {
-          return item;
-        }
-        return closest;
-      }, null);
-      
-      return {
-        created_at: rtItem.created_at,
-        laeq: laeqItem?.laeq || 0,
-        L10: rtItem.L10 || 0,
-        L50: rtItem.L50 || 0,
-        L90: rtItem.L90 || 0,
-        Lmin: hourlyItem?.Lmin || 0,
-        Lmax: hourlyItem?.Lmax || 0,
-      };
-    });
+      });
+    }
     
-    return trendData;
+    // Process L10, L50, L90 data from laeq_realtime
+    if (realtimeResponse.data && Array.isArray(realtimeResponse.data)) {
+      realtimeResponse.data.forEach(item => {
+        if (!item || !item.created_at) return;
+        
+        const date = new Date(item.created_at);
+        const hour = date.getHours();
+        const timeKey = `${hour.toString().padStart(2, '0')}:00`;
+        
+        // Check if this hour is in our target range
+        if (hourlyDataMap.has(timeKey)) {
+          const existingData = hourlyDataMap.get(timeKey);
+          hourlyDataMap.set(timeKey, {
+            ...existingData,
+            l10: parseFloat(item.L10) || existingData.l10 || 0,
+            l50: parseFloat(item.L50) || existingData.l50 || 0,
+            l90: parseFloat(item.L90) || existingData.l90 || 0
+          });
+        }
+      });
+    }
+    
+    // Process Lmin, Lmax from laeq_hourly
+    if (hourlyResponse.data && Array.isArray(hourlyResponse.data)) {
+      hourlyResponse.data.forEach(item => {
+        if (!item || !item.created_at) return;
+        
+        const date = new Date(item.created_at);
+        const hour = date.getHours();
+        const timeKey = `${hour.toString().padStart(2, '0')}:00`;
+        
+        // Check if this hour is in our target range
+        if (hourlyDataMap.has(timeKey)) {
+          const existingData = hourlyDataMap.get(timeKey);
+          hourlyDataMap.set(timeKey, {
+            ...existingData,
+            lmin: parseFloat(item.Lmin) || existingData.lmin || 0,
+            lmax: parseFloat(item.Lmax) || existingData.lmax || 0
+          });
+        }
+      });
+    }
+    
+    // Convert map to array and sort by hour in the correct sequence
+    let resultArray = Array.from(hourlyDataMap.values());
+    
+    // For daytime, sort from 7:00 to 18:00
+    if (timeFilter === 'daytime') {
+      resultArray.sort((a, b) => a.hour - b.hour);
+    } 
+    // For nighttime, sort from 19:00 to 06:00
+    else {
+      resultArray.sort((a, b) => {
+        // This handles the wrap-around at midnight (19, 20, 21..., 0, 1, 2...)
+        const hourA = a.hour < startHour ? a.hour + 24 : a.hour;
+        const hourB = b.hour < startHour ? b.hour + 24 : b.hour;
+        return hourA - hourB;
+      });
+    }
+    
+    // Replace any null values with 0 for chart rendering
+    resultArray = resultArray.map(item => ({
+      ...item,
+      value: item.value ?? 0,
+      l10: item.l10 ?? 0,
+      l50: item.l50 ?? 0,
+      l90: item.l90 ?? 0,
+      lmin: item.lmin ?? 0,
+      lmax: item.lmax ?? 0
+    }));
+
+    // Limit to the requested number of data points if needed
+    if (limit && resultArray.length > limit) {
+      resultArray = resultArray.slice(0, limit);
+    }
+
+    return resultArray;
+
   } catch (error) {
     console.error('Error fetching trend data:', error);
-    throw error;
+    
+    // Log detailed error information if available
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received:', error.request);
+    }
+    
+    // Return empty array as fallback
+    return [];
   }
 };
 

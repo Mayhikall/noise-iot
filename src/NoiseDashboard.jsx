@@ -221,30 +221,7 @@ const NoiseDashboard = () => {
   // Data Filtering Function
   const filterDataByTimePeriod = (data) => {
     if (!data || !Array.isArray(data)) return [];
-
-    return data.filter((item) => {
-      if (!item || (!item.time && !item.created_at)) return false;
-
-      let hour;
-      if (item.created_at) {
-        const itemTime = new Date(item.created_at);
-        hour = itemTime.getHours();
-      } else if (item.time) {
-        // Extract hour from time string (format: "HH:MM")
-        const timeParts = item.time.split(":");
-        if (timeParts.length >= 1) {
-          hour = parseInt(timeParts[0], 10);
-        } else {
-          return true; // If we can't parse the time, include the item
-        }
-      } else {
-        return true; // If no time information, include the item
-      }
-
-      return timeFilter === "daytime"
-        ? hour >= 7 && hour < 19
-        : hour < 7 || hour >= 19;
-    });
+    return data;
   };
 
   // Fetch dashboard summary data
@@ -259,18 +236,20 @@ const NoiseDashboard = () => {
     }
   };
 
-  // Fetch trend data - now using the new fetchTrendData function
-  const loadTrendData = async () => {
-    try {
-      const limit = 60;
-      const response = await fetchTrendData({ limit });
-      const formattedData = formatTrendData(response);
-      setTrendingData(formattedData);
-      console.log("Trend data loaded:", formattedData);
-    } catch (err) {
-      console.error("Error loading trend data:", err);
-    }
-  };
+  // Update the loadTrendData function
+const loadTrendData = async () => {
+  try {
+    const response = await fetchTrendData({ 
+      timeFilter: timeFilter, // Pass the current time filter
+      limit: 12 // We want 12 hours of data
+    });
+    
+    setTrendingData(response);
+    console.log("Trend data loaded:", response);
+  } catch (err) {
+    console.error("Error loading trend data:", err);
+  }
+};
 
   // Fetch minute data
   const fetchMinuteData = async () => {
