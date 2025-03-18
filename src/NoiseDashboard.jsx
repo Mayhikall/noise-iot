@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Clock,
   MapPin,
@@ -47,6 +47,9 @@ const NoiseDashboard = () => {
   const [activeSidebarSection, setActiveSidebarSection] = useState("dashboard");
   const [reportTimeRange, setReportTimeRange] = useState("15minutes");
   const [exportLoading, setExportLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
 
   // Data States
   const [summaryData, setSummaryData] = useState({
@@ -65,150 +68,103 @@ const NoiseDashboard = () => {
   const [error, setError] = useState(null);
 
   // Sidebar Toggle Function
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
 
-  const handleSectionChange = (section) => {
+  const handleSectionChange = useCallback((section) => {
     setActiveSidebarSection(section);
     console.log(`Navigating to: ${section}`);
-  };
+  }, []);
 
   // Format API data for charts
-  const formatTrendData = (data) => {
+  const formatTrendData = useCallback((data) => {
     if (!data || !Array.isArray(data)) return [];
 
-    return data.map((item) => {
-      // Check if the item already has a time property
-      if (item.time) {
-        return {
-          ...item,
-          value: item.value || item.laeq || item.laeq1h || 0,
-          l10: item.L10 || item.l10 || 0,
-          l50: item.L50 || item.l50 || 0,
-          l90: item.L90 || item.l90 || 0,
-          lmin: item.Lmin || item.lmin || 0,
-          lmax: item.Lmax || item.lmax || 0,
-        };
-      }
-
-      // Otherwise, create the time property from created_at
-      return {
-        time: new Date(item.created_at).toLocaleTimeString("id-ID", {
+    return data.map((item) => ({
+      time:
+        item.time ||
+        new Date(item.created_at).toLocaleTimeString("id-ID", {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        value: item.laeq || item.laeq1h || 0,
-        l10: item.L10 || 0,
-        l50: item.L50 || 0,
-        l90: item.L90 || 0,
-        lmin: item.Lmin || 0,
-        lmax: item.Lmax || 0,
-      };
-    });
-  };
+      value: item.value || item.laeq || item.laeq1h || 0,
+      l10: item.L10 || item.l10 || 0,
+      l50: item.L50 || item.l50 || 0,
+      l90: item.L90 || item.l90 || 0,
+      lmin: item.Lmin || item.lmin || 0,
+      lmax: item.Lmax || item.lmax || 0,
+    }));
+  }, []);
 
   // Status Determination Function
-  const getStatus = (noiseLevel) => {
-    if (noiseLevel <= 15) {
+  const getStatus = useCallback((noiseLevel) => {
+    if (noiseLevel <= 15)
       return {
         status: "Silent",
         color: "bg-green-800",
         icon: Volume2,
         description: "Hening, hampir tidak ada suara",
       };
-    }
-
-    if (noiseLevel <= 20) {
+    if (noiseLevel <= 20)
       return {
         status: "Quiet",
         color: "bg-green-600",
         icon: Volume2,
         description: "Suara sangat pelan",
       };
-    }
-
-    if (noiseLevel <= 40) {
+    if (noiseLevel <= 40)
       return {
         status: "Whispered",
         color: "bg-green-400",
         icon: Volume2,
         description: "Berbisik, sangat tenang",
       };
-    }
-
-    if (noiseLevel <= 60) {
+    if (noiseLevel <= 60)
       return {
         status: "Normal",
         color: "bg-yellow-500",
         icon: Volume2,
         description: "Percakapan normal",
       };
-    }
-
-    if (noiseLevel <= 90) {
+    if (noiseLevel <= 90)
       return {
         status: "High",
         color: "bg-orange-500",
         icon: Volume2,
         description: "Mulai merusak pendengaran",
       };
-    }
-
-    if (noiseLevel <= 100) {
+    if (noiseLevel <= 100)
       return {
         status: "Very High",
         color: "bg-orange-700",
         icon: Volume2,
         description: "Kehilangan pendengaran bisa terjadi",
       };
-    }
-
     return {
       status: "Extreme",
       color: "bg-red-700",
       icon: Volume2,
       description: "Bahaya! Kerusakan pendengaran serius",
     };
-  };
+  }, []);
 
   // MQTT Status Icon and Color
-  const getMqttStatusDisplay = () => {
+  const getMqttStatusDisplay = useCallback(() => {
     if (!mqttStatus || mqttStatus.status === "Offline") {
-      return {
-        icon: WifiOff,
-        color: "text-gray-500",
-        text: "Offline",
-      };
+      return { icon: WifiOff, color: "text-gray-500", text: "Offline" };
     }
-
     switch (mqttStatus.quality) {
       case "Baik":
-        return {
-          icon: Wifi,
-          color: "text-green-500",
-          text: "Sinyal Baik",
-        };
+        return { icon: Wifi, color: "text-green-500", text: "Sinyal Baik" };
       case "Sedang":
-        return {
-          icon: Wifi,
-          color: "text-yellow-500",
-          text: "Sinyal Sedang",
-        };
+        return { icon: Wifi, color: "text-yellow-500", text: "Sinyal Sedang" };
       case "Lemah":
-        return {
-          icon: Wifi,
-          color: "text-red-500",
-          text: "Sinyal Lemah",
-        };
+        return { icon: Wifi, color: "text-red-500", text: "Sinyal Lemah" };
       default:
-        return {
-          icon: WifiOff,
-          color: "text-gray-500",
-          text: "Unknown",
-        };
+        return { icon: WifiOff, color: "text-gray-500", text: "Unknown" };
     }
-  };
+  }, [mqttStatus]);
 
   // Get current values from summary data
   const currentLaeq = summaryData?.latestLaeq?.laeq || 0;
@@ -227,21 +183,14 @@ const NoiseDashboard = () => {
   )}, ${currentDateTime.getDate()} ${getBulanIndonesia(
     currentDateTime.getMonth()
   )} ${currentDateTime.getFullYear()}`;
-
   const formattedTime = currentDateTime.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
 
-  // Data Filtering Function
-  const filterDataByTimePeriod = (data) => {
-    if (!data || !Array.isArray(data)) return [];
-    return data;
-  };
-
   // Fetch dashboard summary data
-  const fetchSummaryData = async () => {
+  const fetchSummaryData = useCallback(async () => {
     try {
       const summary = await fetchDashboardSummary();
       setSummaryData(summary);
@@ -250,25 +199,26 @@ const NoiseDashboard = () => {
       console.error("Error loading summary data:", err);
       setError("Failed to load dashboard data");
     }
-  };
+  }, []);
 
-  // Update the loadTrendData function
-const loadTrendData = async () => {
-  try {
-    const response = await fetchTrendData({ 
-      timeFilter: timeFilter, // Pass the current time filter
-      limit: 12 // We want 12 hours of data
-    });
-    
-    setTrendingData(response);
-    console.log("Trend data loaded:", response);
-  } catch (err) {
-    console.error("Error loading trend data:", err);
-  }
-};
+  // Load trend data
+  const loadTrendData = useCallback(async () => {
+    try {
+      const response = await fetchTrendData({
+        timeFilter,
+        year: selectedYear,
+        month: selectedMonth,
+        day: selectedDay,
+      });
+      setTrendingData(response);
+      console.log("Trend data loaded:", response);
+    } catch (err) {
+      console.error("Error loading trend data:", err);
+    }
+  }, [timeFilter, selectedYear, selectedMonth, selectedDay]);
 
   // Fetch minute data
-  const fetchMinuteData = async () => {
+  const fetchMinuteData = useCallback(async () => {
     try {
       const response = await fetchLaeqMinuteData();
       setMinuteData(response);
@@ -276,33 +226,27 @@ const loadTrendData = async () => {
     } catch (err) {
       console.error("Error loading minute data:", err);
     }
-  };
+  }, []);
 
   // Fetch hourly data
-  const fetchHourlyData = async () => {
+  const fetchHourlyData = useCallback(async () => {
     try {
       const response = await fetchLaeqHourlyData({ limit: 24 });
-      // No need to format data as it's already formatted in the API service
       setHourlyData(response);
       console.log("Hourly data loaded:", response);
     } catch (err) {
       console.error("Error loading hourly data:", err);
     }
-  };
+  }, []);
 
-  // Fetch report data - will now include all needed fields
-  const fetchReportData = async () => {
+  // Fetch report data
+  const fetchReportData = useCallback(async () => {
     try {
-      const response = await fetchRealtimeData({
-        // limit: 3000,
-        timeRange: reportTimeRange,
-      });
-
+      const response = await fetchRealtimeD({ timeRange: reportTimeRange });
       if (!response || !Array.isArray(response)) {
         setReportData([]);
         return;
       }
-
       const reportData = response.map((item) => ({
         l10: item.L10 || 0,
         l50: item.L50 || 0,
@@ -317,7 +261,6 @@ const loadTrendData = async () => {
         lmin: item.Lmin || 0,
         created_at: item.created_at,
       }));
-
       setReportData(reportData);
       console.log("Report data loaded:", reportData);
     } catch (err) {
@@ -326,10 +269,10 @@ const loadTrendData = async () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportTimeRange]);
 
-  // Update the fetchMqttStatusData function
-  const fetchMqttStatusData = async () => {
+  // Fetch MQTT status data
+  const fetchMqttStatusData = useCallback(async () => {
     try {
       const status = await fetchMqttStatus();
       setMqttStatus(status);
@@ -343,28 +286,32 @@ const loadTrendData = async () => {
         lastOnlineTimestamp: null,
       });
     }
-  };
+  }, []);
 
   // Handle export report
-  const handleExportReport = async (format) => {
-    try {
-      setExportLoading(true);
-      await exportReportData(format, reportTimeRange);
-      setExportLoading(false);
-    } catch (err) {
-      console.error(`Error exporting ${format} report:`, err);
-      setExportLoading(false);
-      // Show error notification
-      alert(`Failed to export ${format} report. Please try again.`);
-    }
-  };
+  const handleExportReport = useCallback(
+    async (format) => {
+      try {
+        setExportLoading(true);
+        await exportReportData(format, reportTimeRange);
+        setExportLoading(false);
+      } catch (err) {
+        console.error(`Error exporting ${format} report:`, err);
+        setExportLoading(false);
+        alert(`Failed to export ${format} report. Please try again.`);
+      }
+    },
+    [reportTimeRange]
+  );
 
   // Handle report time range change
-  const handleReportTimeRangeChange = (range) => {
-    setReportTimeRange(range);
-    // Reload report data with new time range
-    fetchReportData();
-  };
+  const handleReportTimeRangeChange = useCallback(
+    (range) => {
+      setReportTimeRange(range);
+      fetchReportData();
+    },
+    [fetchReportData]
+  );
 
   // Initial data loading
   useEffect(() => {
@@ -386,14 +333,15 @@ const loadTrendData = async () => {
         setLoading(false);
       }
     };
-
     loadAllData();
-  }, []);
-
-  // Reload report data when time range changes
-  useEffect(() => {
-    fetchReportData();
-  }, [reportTimeRange]);
+  }, [
+    fetchSummaryData,
+    loadTrendData,
+    fetchMinuteData,
+    fetchHourlyData,
+    fetchReportData,
+    fetchMqttStatusData,
+  ]);
 
   // Periodic data and time updates (every 30 seconds)
   useEffect(() => {
@@ -404,35 +352,21 @@ const loadTrendData = async () => {
       fetchReportData();
       fetchMqttStatusData();
     }, 30000);
-
     return () => clearInterval(timer);
-  }, []);
+  }, [fetchSummaryData, loadTrendData, fetchReportData, fetchMqttStatusData]);
 
   // Update minute data every 5 minutes
   useEffect(() => {
-    // Initial load
     fetchMinuteData();
-
-    const timer = setInterval(() => {
-      fetchMinuteData();
-    }, 300000); // 5 minutes
-
+    const timer = setInterval(fetchMinuteData, 300000);
     return () => clearInterval(timer);
-  }, []);
+  }, [fetchMinuteData]);
 
   // Update hourly data every hour
   useEffect(() => {
-    const timer = setInterval(() => {
-      fetchHourlyData();
-    }, 3600000); // 1 hour
-
+    const timer = setInterval(fetchHourlyData, 3600000);
     return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(fetchReportData, 30000); // Update every 30 secondshData, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
-  }, [reportTimeRange]);
+  }, [fetchHourlyData]);
 
   if (loading) {
     return (
@@ -475,43 +409,20 @@ const loadTrendData = async () => {
           activeSection={activeSidebarSection}
           onSectionChange={handleSectionChange}
         />
-
-        {/* Main content */}
         <div className="flex-1 flex flex-col overflow-auto">
           <Header
             formattedDate={formattedDate}
             formattedTime={formattedTime}
             mqttStatus={mqttStatusDisplay}
           />
-
-          {/* Dashboard content */}
           <div className="p-6 flex-1">
             <div className="lg:col-span-1 mb-6">
               <MapPanel
                 currentStatus={currentStatus}
                 deviceId="EETSB"
-                mqttStatus={{
-                  ...mqttStatus,
-                  text: mqttStatusDisplay.text,
-                  color: mqttStatusDisplay.color,
-                  icon: mqttStatusDisplay.icon,
-                  // Ensure we have the correct timestamp properties
-                  lastUpdated:
-                    mqttStatus.lastUpdated ||
-                    mqttStatus.updated_at ||
-                    new Date().toISOString(),
-                  lastOnlineTimestamp:
-                    mqttStatus.lastOnlineTimestamp || mqttStatus.lastUpdated,
-                  // Make sure status is properly parsed from combined string if needed
-                  status:
-                    mqttStatus.status && mqttStatus.status.startsWith("Online")
-                      ? "Online"
-                      : mqttStatus.status,
-                }}
+                mqttStatus={{ ...mqttStatus, ...mqttStatusDisplay }}
               />
             </div>
-
-            {/* Summary Cards */}
             <div className="lg:col-span-3">
               <SummaryCardsRow
                 currentLaeq={currentLaeq}
@@ -520,7 +431,6 @@ const loadTrendData = async () => {
                 currentL90={currentL90}
                 currentStatus={currentStatus}
               />
-
               <div className="mt-6">
                 <SecondaryCardsRow
                   currentLMin={currentLMin}
@@ -529,26 +439,22 @@ const loadTrendData = async () => {
                 />
               </div>
             </div>
-
-            {/* Charts Section */}
             <div className="mb-6">
               <TrendChart
-                data={filterDataByTimePeriod(trendingData)}
+                data={trendingData}
                 timeFilter={timeFilter}
                 onTimeFilterChange={setTimeFilter}
+                year={selectedYear}
+                month={selectedMonth}
+                day={selectedDay}
               />
-
               <MinuteChart data={minuteData} />
               <HourlyChart data={hourlyData} />
             </div>
-
-            {/* Report Section */}
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Data Laporan</h2>
-
                 <div className="flex space-x-2">
-                  {/* Time Range Selector */}
                   <select
                     value={reportTimeRange}
                     onChange={(e) =>
@@ -559,8 +465,6 @@ const loadTrendData = async () => {
                     <option value="15minutes">15 Menit</option>
                     <option value="1hour">1 Jam</option>
                   </select>
-
-                  {/* Export Buttons */}
                   <button
                     onClick={() => handleExportReport("excel")}
                     disabled={exportLoading}
@@ -569,7 +473,6 @@ const loadTrendData = async () => {
                     <FileText size={16} />
                     <span>Excel</span>
                   </button>
-
                   <button
                     onClick={() => handleExportReport("pdf")}
                     disabled={exportLoading}
@@ -580,7 +483,6 @@ const loadTrendData = async () => {
                   </button>
                 </div>
               </div>
-
               <ReportTable
                 reportData={reportData}
                 currentDateTime={currentDateTime.toLocaleString("id-ID")}
@@ -589,8 +491,6 @@ const loadTrendData = async () => {
               />
             </div>
           </div>
-
-          {/* Non-sticky Footer */}
           <Footer />
         </div>
       </div>

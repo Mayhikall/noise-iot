@@ -10,7 +10,7 @@ const Footer = () => {
           Developed by <a href="https://keycloud.id" className="text-blue-400 hover:text-blue-300">keycloud.id</a>
         </div>
         <div>
-          &copy; {currentYear} Duo Driyorejo Master. All rights reserved.
+          &copy; {currentYear} Duo Master. All rights reserved.
         </div>
       </div>
     </footer>
