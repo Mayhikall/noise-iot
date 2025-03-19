@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Clock,
   MapPin,
@@ -55,7 +55,10 @@ const NoiseDashboard = () => {
     latestLaeq: { laeq: 0, L10: 0, L50: 0, L90: 0, Lmax: 0, Lmin: 0 },
     todayStats: { maxLaeq: 0, minLaeq: 0, avgLaeq: 0 },
   });
-  const [trendingData, setTrendingData] = useState([]);
+  const [trendingData, setTrendingData] = useState({
+    daytime: [],
+    nighttime: [],
+  });
   const [minuteData, setMinuteData] = useState([]);
   const [hourlyData, setHourlyData] = useState([]);
   const [reportData, setReportData] = useState([]);
@@ -174,33 +177,59 @@ const NoiseDashboard = () => {
     }
   }, [mqttStatus]);
 
-  // Get current values from summary data
-  const currentLaeq = summaryData?.latestLaeq?.laeq || 0;
-  const currentL10 = summaryData?.latestLaeq?.L10 || 0;
-  const currentL50 = summaryData?.latestLaeq?.L50 || 0;
-  const currentL90 = summaryData?.latestLaeq?.L90 || 0;
-  const currentLMax = summaryData?.latestLaeq?.Lmax || 0;
-  const currentLMin = summaryData?.latestLaeq?.Lmin || 0;
+  // Memoized current values from summary data
+  const currentLaeq = useMemo(
+    () => summaryData?.latestLaeq?.laeq || 0,
+    [summaryData]
+  );
+  const currentL10 = useMemo(
+    () => summaryData?.latestLaeq?.L10 || 0,
+    [summaryData]
+  );
+  const currentL50 = useMemo(
+    () => summaryData?.latestLaeq?.L50 || 0,
+    [summaryData]
+  );
+  const currentL90 = useMemo(
+    () => summaryData?.latestLaeq?.L90 || 0,
+    [summaryData]
+  );
+  const currentLMax = useMemo(
+    () => summaryData?.latestLaeq?.Lmax || 0,
+    [summaryData]
+  );
+  const currentLMin = useMemo(
+    () => summaryData?.latestLaeq?.Lmin || 0,
+    [summaryData]
+  );
 
   // Derive current status
-  const currentStatus = getStatus(currentLaeq);
+  const currentStatus = useMemo(
+    () => getStatus(currentLaeq),
+    [currentLaeq, getStatus]
+  );
 
   // Time and Date Formatting
-  const formattedDate = `${getHariIndonesia(
-    currentDateTime.getDay()
-  )}, ${currentDateTime.getDate()} ${getBulanIndonesia(
-    currentDateTime.getMonth()
-  )} ${currentDateTime.getFullYear()}`;
-  const formattedTime = currentDateTime.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const formattedDate = useMemo(() => {
+    return `${getHariIndonesia(
+      currentDateTime.getDay()
+    )}, ${currentDateTime.getDate()} ${getBulanIndonesia(
+      currentDateTime.getMonth()
+    )} ${currentDateTime.getFullYear()}`;
+  }, [currentDateTime]);
+
+  const formattedTime = useMemo(() => {
+    return currentDateTime.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }, [currentDateTime]);
 
   // Fetch dashboard summary data
   const fetchSummaryData = useCallback(async () => {
     try {
-      setDataLoading(prev => ({ ...prev, summary: true }));
+      setDataLoading((prev) => ({ ...prev, summary: true }));
       const summary = await fetchDashboardSummary();
       setSummaryData(summary);
       console.log("Summary data loaded:", summary);
@@ -210,61 +239,76 @@ const NoiseDashboard = () => {
         setError("Failed to load dashboard data");
       }
     } finally {
-      setDataLoading(prev => ({ ...prev, summary: false }));
+      setDataLoading((prev) => ({ ...prev, summary: false }));
     }
   }, [initialLoading]);
 
-  // Load trend data
-  const loadTrendData = useCallback(async () => {
+  // Pre-fetch both daytime and nighttime trend data
+  const loadAllTrendData = useCallback(async () => {
     try {
-      setDataLoading(prev => ({ ...prev, trend: true }));
-      const response = await fetchTrendData({
-        timeFilter,
-        year: selectedYear,
-        month: selectedMonth,
-        day: selectedDay,
+      setDataLoading((prev) => ({ ...prev, trend: true }));
+
+      // Fetch daytime and nighttime data in parallel
+      const [daytimeData, nighttimeData] = await Promise.all([
+        fetchTrendData({
+          timeFilter: "daytime",
+          year: selectedYear,
+          month: selectedMonth,
+          day: selectedDay,
+        }),
+        fetchTrendData({
+          timeFilter: "nighttime",
+          year: selectedYear,
+          month: selectedMonth,
+          day: selectedDay,
+        }),
+      ]);
+
+      setTrendingData({
+        daytime: daytimeData,
+        nighttime: nighttimeData,
       });
-      setTrendingData(response);
-      console.log("Trend data loaded:", response);
+
+      console.log("All trend data loaded");
     } catch (err) {
       console.error("Error loading trend data:", err);
     } finally {
-      setDataLoading(prev => ({ ...prev, trend: false }));
+      setDataLoading((prev) => ({ ...prev, trend: false }));
     }
-  }, [timeFilter, selectedYear, selectedMonth, selectedDay]);
+  }, [selectedYear, selectedMonth, selectedDay]);
 
-  // Fetch minute data
+  // Fetch minute data with debounce
   const fetchMinuteData = useCallback(async () => {
     try {
-      setDataLoading(prev => ({ ...prev, minute: true }));
+      setDataLoading((prev) => ({ ...prev, minute: true }));
       const response = await fetchLaeqMinuteData();
       setMinuteData(response);
-      console.log("Minute data loaded:", response);
+      console.log("Minute data loaded");
     } catch (err) {
       console.error("Error loading minute data:", err);
     } finally {
-      setDataLoading(prev => ({ ...prev, minute: false }));
+      setDataLoading((prev) => ({ ...prev, minute: false }));
     }
   }, []);
 
-  // Fetch hourly data
+  // Fetch hourly data with debounce
   const fetchHourlyData = useCallback(async () => {
     try {
-      setDataLoading(prev => ({ ...prev, hourly: true }));
+      setDataLoading((prev) => ({ ...prev, hourly: true }));
       const response = await fetchLaeqHourlyData({ limit: 24 });
       setHourlyData(response);
-      console.log("Hourly data loaded:", response);
+      console.log("Hourly data loaded");
     } catch (err) {
       console.error("Error loading hourly data:", err);
     } finally {
-      setDataLoading(prev => ({ ...prev, hourly: false }));
+      setDataLoading((prev) => ({ ...prev, hourly: false }));
     }
   }, []);
 
   // Fetch report data
   const fetchReportData = useCallback(async () => {
     try {
-      setDataLoading(prev => ({ ...prev, report: true }));
+      setDataLoading((prev) => ({ ...prev, report: true }));
       const response = await fetchCombinedRealtimeData({
         timeRange: reportTimeRange,
       });
@@ -274,8 +318,8 @@ const NoiseDashboard = () => {
         return;
       }
 
-      // Memproses data untuk ReportTable
-      const reportData = response.map((item) => {
+      // Process data for ReportTable
+      const processedData = response.map((item) => {
         const baseObject = {
           created_at: item.created_at,
           timestamp: new Date(item.created_at).toLocaleTimeString("id-ID", {
@@ -286,7 +330,7 @@ const NoiseDashboard = () => {
           dataType: item.dataType,
         };
 
-        // Tambahkan data sesuai tipe data
+        // Add data according to type
         switch (item.dataType) {
           case "realtime":
             return {
@@ -314,23 +358,23 @@ const NoiseDashboard = () => {
         }
       });
 
-      setReportData(reportData);
-      console.log("Report data loaded:", reportData);
+      setReportData(processedData);
+      console.log("Report data loaded");
     } catch (err) {
       console.error("Error loading report data:", err);
       setReportData([]);
     } finally {
-      setDataLoading(prev => ({ ...prev, report: false }));
+      setDataLoading((prev) => ({ ...prev, report: false }));
     }
   }, [reportTimeRange]);
 
   // Fetch MQTT status data
   const fetchMqttStatusData = useCallback(async () => {
     try {
-      setDataLoading(prev => ({ ...prev, mqtt: true }));
+      setDataLoading((prev) => ({ ...prev, mqtt: true }));
       const status = await fetchMqttStatus();
       setMqttStatus(status);
-      console.log("MQTT status loaded:", status);
+      console.log("MQTT status loaded");
     } catch (err) {
       console.error("Error loading MQTT status:", err);
       setMqttStatus({
@@ -340,8 +384,14 @@ const NoiseDashboard = () => {
         lastOnlineTimestamp: null,
       });
     } finally {
-      setDataLoading(prev => ({ ...prev, mqtt: false }));
+      setDataLoading((prev) => ({ ...prev, mqtt: false }));
     }
+  }, []);
+
+  // Handle time filter change for trend data
+  const handleTimeFilterChange = useCallback((newFilter) => {
+    setTimeFilter(newFilter);
+    // No need to fetch data again, we already have both daytime and nighttime data
   }, []);
 
   // Handle export report
@@ -361,30 +411,33 @@ const NoiseDashboard = () => {
   );
 
   // Handle report time range change
-  const handleReportTimeRangeChange = useCallback(
-    (range) => {
-      setReportTimeRange(range);
-    },
-    []
-  );
+  const handleReportTimeRangeChange = useCallback((range) => {
+    setReportTimeRange(range);
+  }, []);
 
-  // Efek untuk memantau perubahan reportTimeRange
+  // Effect to monitor reportTimeRange changes
   useEffect(() => {
     fetchReportData();
   }, [reportTimeRange, fetchReportData]);
 
-  // Initial data loading
+  // Effect to monitor date changes
+  useEffect(() => {
+    loadAllTrendData();
+  }, [selectedYear, selectedMonth, selectedDay, loadAllTrendData]);
+
+  // Initial data loading with improved parallelization
   useEffect(() => {
     const loadAllData = async () => {
       setInitialLoading(true);
       try {
+        // Load data in parallel
         await Promise.all([
           fetchSummaryData(),
-          loadTrendData(),
+          loadAllTrendData(),
+          fetchMqttStatusData(),
           fetchMinuteData(),
           fetchHourlyData(),
           fetchReportData(),
-          fetchMqttStatusData(),
         ]);
       } catch (err) {
         setError("Failed to load dashboard data");
@@ -397,21 +450,40 @@ const NoiseDashboard = () => {
     loadAllData();
   }, []);
 
-  // Periodic data and time updates (every 30 seconds)
+  // Staggered data updates to prevent UI freezing
   useEffect(() => {
     const updateDateTime = () => {
       setCurrentDateTime(new Date());
     };
 
-    const timer = setInterval(() => {
-      updateDateTime();
-      fetchSummaryData();
-      loadTrendData();
-      fetchMqttStatusData();
-    }, 30000);
+    let updateSummaryInterval;
+    let updateTrendInterval;
+    let updateMqttInterval;
 
-    return () => clearInterval(timer);
-  }, [fetchSummaryData, loadTrendData, fetchMqttStatusData]);
+    // Set up staggered intervals
+    const setupIntervals = () => {
+      // Update time every second
+      const timeInterval = setInterval(updateDateTime, 1000);
+
+      // Update summary every 15 seconds
+      updateSummaryInterval = setInterval(fetchSummaryData, 15000);
+
+      // Update trend data every 30 seconds
+      updateTrendInterval = setInterval(loadAllTrendData, 30000);
+
+      // Update MQTT status every 20 seconds
+      updateMqttInterval = setInterval(fetchMqttStatusData, 20000);
+
+      return () => {
+        clearInterval(timeInterval);
+        clearInterval(updateSummaryInterval);
+        clearInterval(updateTrendInterval);
+        clearInterval(updateMqttInterval);
+      };
+    };
+
+    return setupIntervals();
+  }, [fetchSummaryData, loadAllTrendData, fetchMqttStatusData]);
 
   // Update report data every minute
   useEffect(() => {
@@ -430,6 +502,23 @@ const NoiseDashboard = () => {
     const timer = setInterval(fetchHourlyData, 3600000);
     return () => clearInterval(timer);
   }, [fetchHourlyData]);
+
+  // Memoized data for chart components
+  const currentTrendData = useMemo(() => {
+    return trendingData[timeFilter] || [];
+  }, [trendingData, timeFilter]);
+
+  // Memoized MQTT status display
+  const mqttStatusDisplay = useMemo(
+    () => getMqttStatusDisplay(),
+    [getMqttStatusDisplay]
+  );
+
+  // Determine if there's any data loading operation in progress
+  const isAnyDataLoading = useMemo(
+    () => Object.values(dataLoading).some((status) => status),
+    [dataLoading]
+  );
 
   if (loading) {
     return (
@@ -459,12 +548,6 @@ const NoiseDashboard = () => {
       </div>
     );
   }
-
-  // Get MQTT status display properties
-  const mqttStatusDisplay = getMqttStatusDisplay();
-
-  // Menentukan apakah ada operasi loading yang sedang berlangsung
-  const isAnyDataLoading = Object.values(dataLoading).some(status => status);
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
@@ -508,9 +591,9 @@ const NoiseDashboard = () => {
             </div>
             <div className="mb-6">
               <TrendChart
-                data={trendingData}
+                data={currentTrendData}
                 timeFilter={timeFilter}
-                onTimeFilterChange={setTimeFilter}
+                onTimeFilterChange={handleTimeFilterChange}
                 year={selectedYear}
                 month={selectedMonth}
                 day={selectedDay}

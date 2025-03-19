@@ -1,26 +1,28 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import MqttStatus from "./MqttStatus";
 
 const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
-  
+  const markerRef = useRef(null);
+  const [mapInitialized, setMapInitialized] = useState(false);
+
   // Get the last updated timestamp
-  const lastUpdatedTimestamp = mqttStatus?.lastUpdated 
-    ? new Date(mqttStatus.lastUpdated) 
+  const lastUpdatedTimestamp = mqttStatus?.lastUpdated
+    ? new Date(mqttStatus.lastUpdated)
     : new Date();
-  
+
   // Get the last online timestamp (if status is offline)
   const lastOnlineTimestamp = mqttStatus?.lastOnlineTimestamp
     ? new Date(mqttStatus.lastOnlineTimestamp)
     : null;
-  
+
   // Format time for display (using Indonesian locale format)
   const formattedTime = lastUpdatedTimestamp.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit"
+    second: "2-digit",
   });
 
   // Format date for display (using Indonesian locale format)
@@ -35,7 +37,7 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
     ? lastOnlineTimestamp.toLocaleTimeString("id-ID", {
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit"
+        second: "2-digit",
       })
     : "N/A";
 
@@ -60,42 +62,57 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
       }
 
       const leafletScript = document.createElement("script");
-      leafletScript.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js";
+      leafletScript.src =
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js";
       leafletScript.crossOrigin = "anonymous";
-      
+
       const leafletCSS = document.createElement("link");
       leafletCSS.rel = "stylesheet";
-      leafletCSS.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css";
+      leafletCSS.href =
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css";
       leafletCSS.crossOrigin = "anonymous";
-      
+
       document.head.appendChild(leafletCSS);
       document.head.appendChild(leafletScript);
-      
+
       leafletScript.onload = () => resolve(window.L);
       leafletScript.onerror = reject;
     });
   };
 
-  // Initialize map
+  // Initialize map - only called once
   const initMap = async () => {
-    // Make sure Leaflet is loaded
-    const L = await loadLeaflet();
-    
-    // Always remove previous map instance if it exists
-    if (mapInstance.current) {
-      mapInstance.current.remove();
-      mapInstance.current = null;
+    if (mapInitialized || !mapRef.current) return;
+
+    try {
+      // Make sure Leaflet is loaded
+      const L = await loadLeaflet();
+
+      // Create new map
+      mapInstance.current = L.map(mapRef.current).setView(
+        [latitude, longitude],
+        15
+      );
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(mapInstance.current);
+
+      // Add marker
+      markerRef.current = L.marker([latitude, longitude]).addTo(
+        mapInstance.current
+      );
+      updateMarkerPopup();
+
+      setMapInitialized(true);
+    } catch (error) {
+      console.error("Error initializing map:", error);
     }
+  };
 
-    // Check if the ref is available
-    if (!mapRef.current) return;
-    
-    // Create new map
-    mapInstance.current = L.map(mapRef.current).setView([latitude, longitude], 15);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'Â© OpenStreetMap contributors',
-    }).addTo(mapInstance.current);
+  // Update marker popup without recreating the map
+  const updateMarkerPopup = () => {
+    if (!markerRef.current || !window.L) return;
 
     // Determine status text to display in popup
     let statusText = "Offline";
@@ -103,7 +120,7 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
     // If current status is online, show Online
     if (mqttStatus?.status === "Online") {
       statusText = "Online";
-    } 
+    }
     // If offline and we have lastOnlineTimestamp, show the last online time
     else if (mqttStatus?.lastOnlineTimestamp) {
       try {
@@ -116,36 +133,48 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
       }
     }
 
-    const marker = L.marker([latitude, longitude]).addTo(mapInstance.current);
-    marker.bindPopup(`
+    markerRef.current
+      .bindPopup(
+        `
       <b>Lokasi: ${latitude}, ${longitude}</b><br>
       Status: ${statusText}<br>
       Device ID: ${deviceId}
-    `).openPopup();
+    `
+      )
+      .openPopup();
   };
 
+  // Initialize map once when component mounts
   useEffect(() => {
-    // Initialize map when component mounts
-    if (mapRef.current) {
-      initMap();
-    }
-    
+    initMap();
+
     // Cleanup function to remove map when component unmounts
     return () => {
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
+        markerRef.current = null;
+        setMapInitialized(false);
       }
     };
-  }, [deviceId, mqttStatus]); // Re-initialize map when these props change
+  }, []); // Empty dependency array ensures this runs only once
+
+  // Update the popup content when mqttStatus or deviceId changes
+  useEffect(() => {
+    if (mapInitialized) {
+      updateMarkerPopup();
+    }
+  }, [mqttStatus, deviceId, mapInitialized]);
 
   // Determine what to show in the right panel
-  const showLastOnlineInfo = mqttStatus?.status === "Offline" && lastOnlineTimestamp;
+  const showLastOnlineInfo =
+    mqttStatus?.status === "Offline" && lastOnlineTimestamp;
 
   // CSS classes for status indicator
-  const statusIndicatorClass = mqttStatus?.status === "Online" 
-    ? "w-3 h-3 rounded-full bg-green-500 mr-2 animate-pulse shadow-lg shadow-green-500/50" 
-    : "w-3 h-3 rounded-full bg-red-500 mr-2";
+  const statusIndicatorClass =
+    mqttStatus?.status === "Online"
+      ? "w-3 h-3 rounded-full bg-green-500 mr-2 animate-pulse shadow-lg shadow-green-500/50"
+      : "w-3 h-3 rounded-full bg-red-500 mr-2";
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
@@ -153,10 +182,10 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
         <MapPin className="mr-2" size={20} />
         Lokasi Monitoring
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div ref={mapRef} className="h-64 lg:col-span-2"></div>
-        
+
         <div className="p-4 flex flex-col justify-center space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -165,8 +194,8 @@ const MapPanel = ({ currentStatus, deviceId, mqttStatus }) => {
             </div>
             <MqttStatus status={mqttStatus} />
           </div>
-          
-          <div className="flex flex-col space-y-2">          
+
+          <div className="flex flex-col space-y-2">
             {/* Show last online time if status is offline */}
             {showLastOnlineInfo && (
               <>
