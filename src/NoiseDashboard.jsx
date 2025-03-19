@@ -64,6 +64,15 @@ const NoiseDashboard = () => {
     quality: "Offline",
   });
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState({
+    summary: false,
+    trend: false,
+    minute: false,
+    hourly: false,
+    report: false,
+    mqtt: false,
+  });
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Sidebar Toggle Function
@@ -191,18 +200,24 @@ const NoiseDashboard = () => {
   // Fetch dashboard summary data
   const fetchSummaryData = useCallback(async () => {
     try {
+      setDataLoading(prev => ({ ...prev, summary: true }));
       const summary = await fetchDashboardSummary();
       setSummaryData(summary);
       console.log("Summary data loaded:", summary);
     } catch (err) {
       console.error("Error loading summary data:", err);
-      setError("Failed to load dashboard data");
+      if (initialLoading) {
+        setError("Failed to load dashboard data");
+      }
+    } finally {
+      setDataLoading(prev => ({ ...prev, summary: false }));
     }
-  }, []);
+  }, [initialLoading]);
 
   // Load trend data
   const loadTrendData = useCallback(async () => {
     try {
+      setDataLoading(prev => ({ ...prev, trend: true }));
       const response = await fetchTrendData({
         timeFilter,
         year: selectedYear,
@@ -213,35 +228,43 @@ const NoiseDashboard = () => {
       console.log("Trend data loaded:", response);
     } catch (err) {
       console.error("Error loading trend data:", err);
+    } finally {
+      setDataLoading(prev => ({ ...prev, trend: false }));
     }
   }, [timeFilter, selectedYear, selectedMonth, selectedDay]);
 
   // Fetch minute data
   const fetchMinuteData = useCallback(async () => {
     try {
+      setDataLoading(prev => ({ ...prev, minute: true }));
       const response = await fetchLaeqMinuteData();
       setMinuteData(response);
       console.log("Minute data loaded:", response);
     } catch (err) {
       console.error("Error loading minute data:", err);
+    } finally {
+      setDataLoading(prev => ({ ...prev, minute: false }));
     }
   }, []);
 
   // Fetch hourly data
   const fetchHourlyData = useCallback(async () => {
     try {
+      setDataLoading(prev => ({ ...prev, hourly: true }));
       const response = await fetchLaeqHourlyData({ limit: 24 });
       setHourlyData(response);
       console.log("Hourly data loaded:", response);
     } catch (err) {
       console.error("Error loading hourly data:", err);
+    } finally {
+      setDataLoading(prev => ({ ...prev, hourly: false }));
     }
   }, []);
 
   // Fetch report data
   const fetchReportData = useCallback(async () => {
     try {
-      setLoading(true);
+      setDataLoading(prev => ({ ...prev, report: true }));
       const response = await fetchCombinedRealtimeData({
         timeRange: reportTimeRange,
       });
@@ -297,13 +320,14 @@ const NoiseDashboard = () => {
       console.error("Error loading report data:", err);
       setReportData([]);
     } finally {
-      setLoading(false);
+      setDataLoading(prev => ({ ...prev, report: false }));
     }
   }, [reportTimeRange]);
 
   // Fetch MQTT status data
   const fetchMqttStatusData = useCallback(async () => {
     try {
+      setDataLoading(prev => ({ ...prev, mqtt: true }));
       const status = await fetchMqttStatus();
       setMqttStatus(status);
       console.log("MQTT status loaded:", status);
@@ -315,6 +339,8 @@ const NoiseDashboard = () => {
         lastUpdated: new Date().toISOString(),
         lastOnlineTimestamp: null,
       });
+    } finally {
+      setDataLoading(prev => ({ ...prev, mqtt: false }));
     }
   }, []);
 
@@ -338,15 +364,19 @@ const NoiseDashboard = () => {
   const handleReportTimeRangeChange = useCallback(
     (range) => {
       setReportTimeRange(range);
-      fetchReportData();
     },
-    [fetchReportData]
+    []
   );
+
+  // Efek untuk memantau perubahan reportTimeRange
+  useEffect(() => {
+    fetchReportData();
+  }, [reportTimeRange, fetchReportData]);
 
   // Initial data loading
   useEffect(() => {
     const loadAllData = async () => {
-      setLoading(true);
+      setInitialLoading(true);
       try {
         await Promise.all([
           fetchSummaryData(),
@@ -360,34 +390,37 @@ const NoiseDashboard = () => {
         setError("Failed to load dashboard data");
         console.error("Error loading data:", err);
       } finally {
+        setInitialLoading(false);
         setLoading(false);
       }
     };
     loadAllData();
-  }, [
-    fetchSummaryData,
-    loadTrendData,
-    fetchMinuteData,
-    fetchHourlyData,
-    fetchReportData,
-    fetchMqttStatusData,
-  ]);
+  }, []);
 
   // Periodic data and time updates (every 30 seconds)
   useEffect(() => {
-    const timer = setInterval(() => {
+    const updateDateTime = () => {
       setCurrentDateTime(new Date());
+    };
+
+    const timer = setInterval(() => {
+      updateDateTime();
       fetchSummaryData();
       loadTrendData();
-      fetchReportData();
       fetchMqttStatusData();
     }, 30000);
+
     return () => clearInterval(timer);
-  }, [fetchSummaryData, loadTrendData, fetchReportData, fetchMqttStatusData]);
+  }, [fetchSummaryData, loadTrendData, fetchMqttStatusData]);
+
+  // Update report data every minute
+  useEffect(() => {
+    const timer = setInterval(fetchReportData, 60000);
+    return () => clearInterval(timer);
+  }, [fetchReportData]);
 
   // Update minute data every 5 minutes
   useEffect(() => {
-    fetchMinuteData();
     const timer = setInterval(fetchMinuteData, 300000);
     return () => clearInterval(timer);
   }, [fetchMinuteData]);
@@ -430,6 +463,9 @@ const NoiseDashboard = () => {
   // Get MQTT status display properties
   const mqttStatusDisplay = getMqttStatusDisplay();
 
+  // Menentukan apakah ada operasi loading yang sedang berlangsung
+  const isAnyDataLoading = Object.values(dataLoading).some(status => status);
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
@@ -444,6 +480,7 @@ const NoiseDashboard = () => {
             formattedDate={formattedDate}
             formattedTime={formattedTime}
             mqttStatus={mqttStatusDisplay}
+            isLoading={isAnyDataLoading}
           />
           <div className="p-6 flex-1">
             <div className="lg:col-span-1 mb-6">
@@ -477,9 +514,10 @@ const NoiseDashboard = () => {
                 year={selectedYear}
                 month={selectedMonth}
                 day={selectedDay}
+                isLoading={dataLoading.trend}
               />
-              <MinuteChart data={minuteData} />
-              <HourlyChart data={hourlyData} />
+              <MinuteChart data={minuteData} isLoading={dataLoading.minute} />
+              <HourlyChart data={hourlyData} isLoading={dataLoading.hourly} />
             </div>
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
@@ -497,7 +535,7 @@ const NoiseDashboard = () => {
                   </select>
                   <button
                     onClick={() => handleExportReport("excel")}
-                    disabled={exportLoading}
+                    disabled={exportLoading || dataLoading.report}
                     className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FileText size={16} />
@@ -505,7 +543,7 @@ const NoiseDashboard = () => {
                   </button>
                   <button
                     onClick={() => handleExportReport("pdf")}
-                    disabled={exportLoading}
+                    disabled={exportLoading || dataLoading.report}
                     className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Download size={16} />
@@ -518,6 +556,7 @@ const NoiseDashboard = () => {
                 currentDateTime={currentDateTime.toLocaleString("id-ID")}
                 timeRange={reportTimeRange}
                 fetchMoreData={fetchReportData}
+                isLoading={dataLoading.report}
               />
             </div>
           </div>
