@@ -173,6 +173,7 @@ export const fetchLaeqHourlyData = async (params = {}) => {
   }
 };
 
+// Fungsi asli tetap tidak berubah
 export const fetchRealtimeData = async (params = {}) => {
   try {
     const { timeRange, ...otherParams } = params;
@@ -181,7 +182,6 @@ export const fetchRealtimeData = async (params = {}) => {
       now.getTime() -
         (timeRange === "15minutes" ? 15 * 60 * 1000 : 60 * 60 * 1000)
     );
-
     const response = await api.get("/laeq-realtime", {
       params: {
         ...otherParams,
@@ -189,10 +189,88 @@ export const fetchRealtimeData = async (params = {}) => {
         sort: "created_at,desc",
       },
     });
-
     return response.data || [];
   } catch (error) {
     console.error("Error fetching real-time data:", error);
+    return [];
+  }
+};
+
+// Tambahkan fungsi baru untuk mengambil data dari ketiga endpoint
+export const fetchCombinedRealtimeData = async (params = {}) => {
+  try {
+    // Parse timeRange dari parameter
+    const { timeRange, ...otherParams } = params;
+    const now = new Date();
+    const timeAgo = new Date(
+      now.getTime() -
+        (timeRange === "15minutes" ? 15 * 60 * 1000 : 60 * 60 * 1000)
+    );
+
+    // Fetch data from all three endpoints in parallel using Promise.all
+    const [realtimeData, laeqData, hourlyData] = await Promise.all([
+      // Original realtime data (L10, L50, L90)
+      api.get("/laeq-realtime", {
+        params: {
+          ...otherParams,
+          created_at: { $gte: timeAgo.toISOString() },
+          sort: "created_at,desc",
+        },
+      }),
+
+      // LAeq data from tbl-laeq
+      api.get("/tbl-laeq", {
+        params: {
+          ...otherParams,
+          created_at: { $gte: timeAgo.toISOString() },
+          sort: "created_at,desc",
+        },
+      }),
+
+      // Lmin, Lmax from laeq-hourly
+      api.get("/laeq-hourly", {
+        params: {
+          ...otherParams,
+          created_at: { $gte: timeAgo.toISOString() },
+          sort: "created_at,desc",
+        },
+      }),
+    ]);
+
+    // Memproses data dari ketiga endpoint
+    const processedData = {
+      realtime: (realtimeData.data || []).map((item) => ({
+        created_at: item.created_at,
+        dataType: "realtime",
+        L10: item.L10 || 0,
+        L50: item.L50 || 0,
+        L90: item.L90 || 0,
+      })),
+
+      laeq: (laeqData.data || []).map((item) => ({
+        created_at: item.created_at,
+        dataType: "laeq",
+        laeq: item.laeq || 0,
+      })),
+
+      hourly: (hourlyData.data || []).map((item) => ({
+        created_at: item.created_at,
+        dataType: "hourly",
+        Lmin: item.Lmin || 0,
+        Lmax: item.Lmax || 0,
+      })),
+    };
+
+    // Gabungkan semua data dan urutkan berdasarkan timestamp tanpa mencocokkan
+    const allData = [
+      ...processedData.realtime,
+      ...processedData.laeq,
+      ...processedData.hourly,
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    return allData;
+  } catch (error) {
+    console.error("Error fetching combined realtime data:", error);
     return [];
   }
 };

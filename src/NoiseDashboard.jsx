@@ -30,13 +30,12 @@ import Footer from "./components/Footer";
 // Import API services
 import {
   fetchDashboardSummary,
-  fetchLaeqData,
   fetchLaeqMinuteData,
   fetchLaeqHourlyData,
-  fetchRealtimeData,
   fetchMqttStatus,
   fetchTrendData,
   exportReportData,
+  fetchCombinedRealtimeData,
 } from "./services/api";
 
 const NoiseDashboard = () => {
@@ -242,25 +241,56 @@ const NoiseDashboard = () => {
   // Fetch report data
   const fetchReportData = useCallback(async () => {
     try {
-      const response = await fetchRealtimeD({ timeRange: reportTimeRange });
+      setLoading(true);
+      const response = await fetchCombinedRealtimeData({
+        timeRange: reportTimeRange,
+      });
+
       if (!response || !Array.isArray(response)) {
         setReportData([]);
         return;
       }
-      const reportData = response.map((item) => ({
-        l10: item.L10 || 0,
-        l50: item.L50 || 0,
-        l90: item.L90 || 0,
-        value: item.laeq || 0,
-        timestamp: new Date(item.created_at).toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-        lmax: item.Lmax || 0,
-        lmin: item.Lmin || 0,
-        created_at: item.created_at,
-      }));
+
+      // Memproses data untuk ReportTable
+      const reportData = response.map((item) => {
+        const baseObject = {
+          created_at: item.created_at,
+          timestamp: new Date(item.created_at).toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+          dataType: item.dataType,
+        };
+
+        // Tambahkan data sesuai tipe data
+        switch (item.dataType) {
+          case "realtime":
+            return {
+              ...baseObject,
+              l10: item.L10,
+              l50: item.L50,
+              l90: item.L90,
+            };
+
+          case "laeq":
+            return {
+              ...baseObject,
+              value: item.laeq,
+            };
+
+          case "hourly":
+            return {
+              ...baseObject,
+              lmin: item.Lmin,
+              lmax: item.Lmax,
+            };
+
+          default:
+            return baseObject;
+        }
+      });
+
       setReportData(reportData);
       console.log("Report data loaded:", reportData);
     } catch (err) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,29 +17,61 @@ const ReportTable = ({
   onRefresh,
   onExport,
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [displayData, setDisplayData] = useState([]);
+  // Separate pagination state for each tab
+  const [paginationState, setPaginationState] = useState({
+    all: { currentPage: 1, itemsPerPage: 10 },
+    laeq: { currentPage: 1, itemsPerPage: 10 },
+    percentiles: { currentPage: 1, itemsPerPage: 10 },
+    extremes: { currentPage: 1, itemsPerPage: 10 },
+  });
   const [activeTab, setActiveTab] = useState("all");
 
-  // Update display data when page changes or data changes
-  useEffect(() => {
+  // Filter data based on type
+  const filteredData = useMemo(() => {
+    return {
+      all: reportData,
+      laeq: reportData.filter((item) => item.dataType === "laeq"),
+      percentiles: reportData.filter((item) => item.dataType === "realtime"),
+      extremes: reportData.filter((item) => item.dataType === "hourly"),
+    };
+  }, [reportData]);
+
+  // Get current pagination settings based on active tab
+  const getCurrentPagination = () => {
+    return paginationState[activeTab];
+  };
+
+  // Get display data based on current tab and pagination
+  const getDisplayData = () => {
+    const { currentPage, itemsPerPage } = getCurrentPagination();
+    const relevantData = filteredData[activeTab];
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    setDisplayData(reportData.slice(startIndex, endIndex));
-    setTotalPages(Math.max(1, Math.ceil(reportData.length / itemsPerPage)));
 
-    // Reset to first page if there's no data for current page
-    if (currentPage > 1 && startIndex >= reportData.length) {
-      setCurrentPage(1);
-    }
-  }, [currentPage, reportData, itemsPerPage]);
+    return relevantData.slice(startIndex, endIndex);
+  };
+
+  // Calculate total pages based on current tab
+  const getTotalPages = () => {
+    const { itemsPerPage } = getCurrentPagination();
+    const relevantData = filteredData[activeTab];
+    return Math.max(1, Math.ceil(relevantData.length / itemsPerPage));
+  };
+
+  // Update pagination for a specific tab
+  const updatePagination = (tab, updates) => {
+    setPaginationState((prev) => ({
+      ...prev,
+      [tab]: { ...prev[tab], ...updates },
+    }));
+  };
 
   // Handle page changes
   const goToPage = (page) => {
+    const totalPages = getTotalPages();
     if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+
+    updatePagination(activeTab, { currentPage: page });
 
     // Fetch more data if needed
     if (
@@ -50,6 +82,17 @@ const ReportTable = ({
       fetchMoreData();
     }
   };
+
+  // Handle tab changes
+  useEffect(() => {
+    // Reset to first page when changing tabs
+    const { currentPage } = getCurrentPagination();
+    const totalPages = getTotalPages();
+
+    if (currentPage > totalPages) {
+      updatePagination(activeTab, { currentPage: 1 });
+    }
+  }, [activeTab, reportData]);
 
   // Helper function to format date - using the timestamp from each data item
   const getBulanIndonesia = (month) => {
@@ -144,13 +187,17 @@ const ReportTable = ({
 
   // Improved pagination controls
   const renderPagination = () => {
-    // Calculate which page numbers to show
+    const { currentPage, itemsPerPage } = getCurrentPagination();
+    const totalItems = filteredData[activeTab].length;
+    const totalPages = getTotalPages();
+
+    // Calculate page numbers to display
     const pageNumbers = [];
     const maxPageButtons = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
     let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
-    // Adjust if we're near the end
+    // Adjust if near the end
     if (endPage - startPage + 1 < maxPageButtons) {
       startPage = Math.max(1, endPage - maxPageButtons + 1);
     }
@@ -162,7 +209,12 @@ const ReportTable = ({
     return (
       <div className="p-3 bg-gray-800 flex justify-between items-center">
         <div className="text-sm text-gray-300">
-          Showing {displayData.length} of {reportData.length} entries
+          Showing{" "}
+          {Math.min(
+            itemsPerPage,
+            totalItems - (currentPage - 1) * itemsPerPage
+          )}{" "}
+          of {totalItems} entries
         </div>
 
         <div className="flex items-center gap-1">
@@ -253,247 +305,280 @@ const ReportTable = ({
   };
 
   // Render the LAeq table
-  const renderLAeqTable = () => (
-    <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
-      <div className="bg-gradient-to-r from-gray-800 to-gray-700 p-4">
-        <h3 className="text-lg font-medium text-white flex items-center">
-          <Volume2 size={18} className="mr-2" />
-          Report LAeq
-        </h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-700">
-          <thead className="bg-gray-700">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-              >
-                created_at
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-              >
-                value
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-gray-800 divide-y divide-gray-700">
-            {displayData.length > 0 ? (
-              displayData.map((item, index) => {
-                const { date, time } = formatDate(item.created_at);
-                return (
-                  <tr key={`laeq-${index}`} className="hover:bg-gray-750">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {date} {time}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getBackgroundColor(
-                        item.value,
-                        "laeq"
-                      )}`}
-                    >
-                      {item.value ? item.value.toFixed(1) : "0.0"}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
+  const renderLAeqTable = () => {
+    const displayData =
+      activeTab === "laeq"
+        ? getDisplayData()
+        : filteredData.laeq.slice(0, getCurrentPagination().itemsPerPage);
+
+    return (
+      <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
+        <div className="bg-gradient-to-r from-gray-800 to-gray-700 p-4">
+          <h3 className="text-lg font-medium text-white flex items-center">
+            <Volume2 size={18} className="mr-2" />
+            Report LAeq
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-700">
               <tr>
-                <td colSpan="2" className="px-6 py-4 text-center text-gray-500">
-                  No data available
-                </td>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                >
+                  created_at
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                >
+                  value
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
+              {displayData.length > 0 ? (
+                displayData.map((item, index) => {
+                  const { date, time } = formatDate(item.created_at);
+                  return (
+                    <tr key={`laeq-${index}`} className="hover:bg-gray-750">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {date} {time}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getBackgroundColor(
+                          item.value,
+                          "laeq"
+                        )}`}
+                      >
+                        {item.value ? item.value.toFixed(1) : "0.0"}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan="2"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
+                    No data available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {activeTab === "laeq" && renderPagination()}
       </div>
-      {renderPagination()}
-    </div>
-  );
+    );
+  };
 
   // Render the L10, L50, L90 table (percentiles)
-  const renderPercentilesTable = () => (
-    <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
-      <div className="bg-gradient-to-r from-gray-800 to-gray-700 p-4">
-        <h3 className="text-lg font-medium text-white flex items-center">
-          <ArrowDownUp size={18} className="mr-2" />
-          Report L10, L50 & L90
-        </h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-700">
-          <thead className="bg-gray-700">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-              >
-                created_at
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider"
-              >
-                <div className="flex items-center">
-                  <TrendingUp size={16} className="mr-2" />
-                  L10
-                </div>
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider"
-              >
-                <div className="flex items-center">
-                  <ArrowDownUp size={16} className="mr-2" />
-                  L50
-                </div>
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase tracking-wider"
-              >
-                <div className="flex items-center">
-                  <TrendingDown size={16} className="mr-2" />
-                  L90
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-gray-800 divide-y divide-gray-700">
-            {displayData.length > 0 ? (
-              displayData.map((item, index) => {
-                const { date, time } = formatDate(item.created_at);
-                return (
-                  <tr
-                    key={`percentiles-${index}`}
-                    className="hover:bg-gray-750"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {date} {time}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-100 ${getBackgroundColor(
-                        item.l10,
-                        "l10"
-                      )}`}
-                    >
-                      {item.l10 ? item.l10.toFixed(1) : "0.0"}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-100 ${getBackgroundColor(
-                        item.l50,
-                        "l50"
-                      )}`}
-                    >
-                      {item.l50 ? item.l50.toFixed(1) : "0.0"}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-purple-100 ${getBackgroundColor(
-                        item.l90,
-                        "l90"
-                      )}`}
-                    >
-                      {item.l90 ? item.l90.toFixed(1) : "0.0"}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
+  const renderPercentilesTable = () => {
+    const displayData =
+      activeTab === "percentiles"
+        ? getDisplayData()
+        : filteredData.percentiles.slice(
+            0,
+            getCurrentPagination().itemsPerPage
+          );
+
+    return (
+      <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
+        <div className="bg-gradient-to-r from-gray-800 to-gray-700 p-4">
+          <h3 className="text-lg font-medium text-white flex items-center">
+            <ArrowDownUp size={18} className="mr-2" />
+            Report L10, L50 & L90
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-700">
               <tr>
-                <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
-                  No data available
-                </td>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                >
+                  created_at
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-blue-300 uppercase tracking-wider"
+                >
+                  <div className="flex items-center">
+                    <TrendingUp size={16} className="mr-2" />
+                    L10
+                  </div>
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider"
+                >
+                  <div className="flex items-center">
+                    <ArrowDownUp size={16} className="mr-2" />
+                    L50
+                  </div>
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase tracking-wider"
+                >
+                  <div className="flex items-center">
+                    <TrendingDown size={16} className="mr-2" />
+                    L90
+                  </div>
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
+              {displayData.length > 0 ? (
+                displayData.map((item, index) => {
+                  const { date, time } = formatDate(item.created_at);
+                  return (
+                    <tr
+                      key={`percentiles-${index}`}
+                      className="hover:bg-gray-750"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {date} {time}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-100 ${getBackgroundColor(
+                          item.l10,
+                          "l10"
+                        )}`}
+                      >
+                        {item.l10 ? item.l10.toFixed(1) : "0.0"}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-100 ${getBackgroundColor(
+                          item.l50,
+                          "l50"
+                        )}`}
+                      >
+                        {item.l50 ? item.l50.toFixed(1) : "0.0"}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-purple-100 ${getBackgroundColor(
+                          item.l90,
+                          "l90"
+                        )}`}
+                      >
+                        {item.l90 ? item.l90.toFixed(1) : "0.0"}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
+                    No data available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {activeTab === "percentiles" && renderPagination()}
       </div>
-      {renderPagination()}
-    </div>
-  );
+    );
+  };
 
   // Render the Lmin & Lmax table (extremes)
-  const renderExtremesTable = () => (
-    <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
-      <div className="bg-gradient-to-r from-gray-800 to-gray-700 p-4">
-        <h3 className="text-lg font-medium text-white flex items-center">
-          <TrendingUp size={18} className="mr-2" />
-          Report LMin & LMax
-        </h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-700">
-          <thead className="bg-gray-700">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
-              >
-                created_at
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-cyan-300 uppercase tracking-wider"
-              >
-                <div className="flex items-center">
-                  <TrendingDown size={16} className="mr-2" />
-                  Lmin
-                </div>
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-amber-300 uppercase tracking-wider"
-              >
-                <div className="flex items-center">
-                  <TrendingUp size={16} className="mr-2" />
-                  Lmax
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-gray-800 divide-y divide-gray-700">
-            {displayData.length > 0 ? (
-              displayData.map((item, index) => {
-                const { date, time } = formatDate(item.created_at);
-                return (
-                  <tr key={`extremes-${index}`} className="hover:bg-gray-750">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {date} {time}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-cyan-100 ${getBackgroundColor(
-                        item.lmin,
-                        "lmin"
-                      )}`}
-                    >
-                      {item.lmin ? item.lmin.toFixed(1) : "0.0"}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-amber-100 ${getBackgroundColor(
-                        item.lmax,
-                        "lmax"
-                      )}`}
-                    >
-                      {item.lmax ? item.lmax.toFixed(1) : "0.0"}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
+  const renderExtremesTable = () => {
+    const displayData =
+      activeTab === "extremes"
+        ? getDisplayData()
+        : filteredData.extremes.slice(0, getCurrentPagination().itemsPerPage);
+
+    return (
+      <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
+        <div className="bg-gradient-to-r from-gray-800 to-gray-700 p-4">
+          <h3 className="text-lg font-medium text-white flex items-center">
+            <TrendingUp size={18} className="mr-2" />
+            Report LMin & LMax
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-700">
               <tr>
-                <td colSpan="3" className="px-6 py-4 text-center text-gray-500">
-                  No data available
-                </td>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                >
+                  created_at
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-cyan-300 uppercase tracking-wider"
+                >
+                  <div className="flex items-center">
+                    <TrendingDown size={16} className="mr-2" />
+                    Lmin
+                  </div>
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-amber-300 uppercase tracking-wider"
+                >
+                  <div className="flex items-center">
+                    <TrendingUp size={16} className="mr-2" />
+                    Lmax
+                  </div>
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
+              {displayData.length > 0 ? (
+                displayData.map((item, index) => {
+                  const { date, time } = formatDate(item.created_at);
+                  return (
+                    <tr key={`extremes-${index}`} className="hover:bg-gray-750">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {date} {time}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-cyan-100 ${getBackgroundColor(
+                          item.lmin,
+                          "lmin"
+                        )}`}
+                      >
+                        {item.lmin ? item.lmin.toFixed(1) : "0.0"}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-amber-100 ${getBackgroundColor(
+                          item.lmax,
+                          "lmax"
+                        )}`}
+                      >
+                        {item.lmax ? item.lmax.toFixed(1) : "0.0"}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan="3"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
+                    No data available
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {activeTab === "extremes" && renderPagination()}
       </div>
-      {renderPagination()}
-    </div>
-  );
+    );
+  };
 
   // Tab navigation component
   const renderTabNavigation = () => (
@@ -576,6 +661,50 @@ const ReportTable = ({
     }
   };
 
+  // Items per page selector - now dynamically changed per tab
+  const renderItemsPerPageSelector = () => {
+    const { itemsPerPage } = getCurrentPagination();
+    const totalItems = filteredData[activeTab].length;
+
+    // Calculate appropriate options based on data size
+    const options = [5, 10, 25, 50].filter(
+      (option) => option <= totalItems * 2
+    );
+    if (options.length === 0) options.push(5);
+
+    // Add an option for all items if it's reasonable
+    if (totalItems <= 100 && !options.includes(totalItems)) {
+      options.push(totalItems);
+    }
+
+    // Sort options numerically
+    options.sort((a, b) => a - b);
+
+    return (
+      <div className="flex justify-end mt-4">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-400">Items per page:</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) =>
+              updatePagination(activeTab, {
+                itemsPerPage: parseInt(e.target.value),
+                currentPage: 1, // Reset to first page when changing items per page
+              })
+            }
+            className="bg-gray-700 text-white rounded px-2 py-1 text-sm"
+          >
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option === totalItems ? `All (${totalItems})` : option}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-4">
       {renderDateTime()}
@@ -590,21 +719,7 @@ const ReportTable = ({
         renderExtremesTable()}
 
       {/* Items per page selector */}
-      <div className="flex justify-end mt-4">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-400">Items per page:</span>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-            className="bg-gray-700 text-white rounded px-2 py-1 text-sm"
-          >
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
-        </div>
-      </div>
+      {renderItemsPerPageSelector()}
     </div>
   );
 };
