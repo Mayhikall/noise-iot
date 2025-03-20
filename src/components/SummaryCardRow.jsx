@@ -40,7 +40,7 @@ const SummaryCardsRow = ({
         });
 
         // Extract previous values (second item in each array if available)
-        const prevLaeq = laeqResponse.length > 1 ? laeqResponse[1].laeq : 0;
+        const prevLaeq = laeqResponse.length > 1 ? laeqResponse[1].value : 0;
 
         // For L10, L50, L90 values
         let prevL10 = 0,
@@ -78,7 +78,7 @@ const SummaryCardsRow = ({
           if (storedValues) {
             const parsedValues = JSON.parse(storedValues);
             setPreviousValues({
-              laeq: parsedValues.laeq || 0,
+              laeq: parsedValues.value || 0,
               l10: parsedValues.l10 || 0,
               l50: parsedValues.l50 || 0,
               l90: parsedValues.l90 || 0,

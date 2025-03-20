@@ -30,15 +30,15 @@ api.interceptors.response.use(
 export const fetchDashboardSummary = async () => {
   try {
     // Fetch LAeq from tbl_laeq for latest LAeq
-    const laeqResponse = await api.get("/tbl-laeq", { params: { limit: 1 } });
+    const laeqResponse = await api.get("/laeq", { params: { limit: 1 } });
 
     // Fetch L10, L50, L90 from laeq_realtime
-    const realTimeResponse = await api.get("/laeq-realtime", {
+    const realTimeResponse = await api.get("/laeq-metrics", {
       params: { limit: 1 },
     });
 
     // Fetch Lmin, Lmax from laeq_hourly for today's stats
-    const hourlyResponse = await api.get("/laeq-hourly", {
+    const hourlyResponse = await api.get("/laeq-lmin-lmax", {
       params: {
         limit: 1,
         // Get the latest hourly record
@@ -48,7 +48,7 @@ export const fetchDashboardSummary = async () => {
 
     // Combine the data with proper null checks
     const latestLaeq = {
-      laeq: laeqResponse.data?.[0]?.laeq || 0,
+      laeq: laeqResponse.data?.[0]?.value || 0,
       L10: realTimeResponse.data?.[0]?.L10 || 0,
       L50: realTimeResponse.data?.[0]?.L50 || 0,
       L90: realTimeResponse.data?.[0]?.L90 || 0,
@@ -58,7 +58,7 @@ export const fetchDashboardSummary = async () => {
 
     // Get today's stats - calculate from hourly data
     const today = new Date().toISOString().split("T")[0];
-    const todayHourlyResponse = await api.get("/laeq-hourly", {
+    const todayHourlyResponse = await api.get("/laeq-lmin-lmax", {
       params: {
         date: today,
       },
@@ -106,7 +106,7 @@ export const fetchDashboardSummary = async () => {
 export const fetchLaeqData = async (params = {}) => {
   try {
     // Fetch from tbl_laeq for Realtime LAeq
-    const response = await api.get("/tbl-laeq", { params });
+    const response = await api.get("/laeq", { params });
     return response.data || [];
   } catch (error) {
     console.error("Error fetching LAeq data:", error);
@@ -152,7 +152,7 @@ export const fetchLaeqMinuteData = async (params = {}) => {
 export const fetchLaeqHourlyData = async (params = {}) => {
   try {
     // Fetch from laeq_hourly for Hourly LAeq
-    const response = await api.get("/laeq-hourly", { params });
+    const response = await api.get("/laeq-lmin-lmax", { params });
 
     // Map the data to the format expected by the component
     const formattedData = response.data.map((item) => ({
@@ -182,7 +182,7 @@ export const fetchRealtimeData = async (params = {}) => {
       now.getTime() -
         (timeRange === "15minutes" ? 15 * 60 * 1000 : 60 * 60 * 1000)
     );
-    const response = await api.get("/laeq-realtime", {
+    const response = await api.get("/laeq-metrics", {
       params: {
         ...otherParams,
         created_at: { $gte: timeAgo.toISOString() },
@@ -210,7 +210,7 @@ export const fetchCombinedRealtimeData = async (params = {}) => {
     // Fetch data from all three endpoints in parallel using Promise.all
     const [realtimeData, laeqData, hourlyData] = await Promise.all([
       // Original realtime data (L10, L50, L90)
-      api.get("/laeq-realtime", {
+      api.get("/laeq-metrics", {
         params: {
           ...otherParams,
           created_at: { $gte: timeAgo.toISOString() },
@@ -219,7 +219,7 @@ export const fetchCombinedRealtimeData = async (params = {}) => {
       }),
 
       // LAeq data from tbl-laeq
-      api.get("/tbl-laeq", {
+      api.get("/laeq", {
         params: {
           ...otherParams,
           created_at: { $gte: timeAgo.toISOString() },
@@ -228,7 +228,7 @@ export const fetchCombinedRealtimeData = async (params = {}) => {
       }),
 
       // Lmin, Lmax from laeq-hourly
-      api.get("/laeq-hourly", {
+      api.get("/laeq-lmin-lmax", {
         params: {
           ...otherParams,
           created_at: { $gte: timeAgo.toISOString() },
@@ -352,7 +352,7 @@ export const fetchMqttStatus = async () => {
     // If online, fetch LAeq to determine signal strength
     if (mqttData.status === "Online") {
       try {
-        const laeqResponse = await api.get("/tbl-laeq", {
+        const laeqResponse = await api.get("/laeq", {
           params: { limit: 1 },
         });
         const laeqValue = laeqResponse.data?.[0]?.laeq || 0;
@@ -412,13 +412,13 @@ export const fetchTrendData = async (params = {}) => {
     // Fetch all required data in parallel
     const [laeqResponse, realtimeResponse, hourlyResponse] = await Promise.all([
       // Fetch LAeq from tbl_laeq (hourly aggregated)
-      api.get("/tbl-laeq", { params: queryParams }),
+      api.get("/laeq", { params: queryParams }),
 
       // Fetch L10, L50, L90 from laeq_realtime (hourly aggregated)
-      api.get("/laeq-realtime", { params: queryParams }),
+      api.get("/laeq-metrics", { params: queryParams }),
 
       // Fetch Lmin, Lmax from laeq_hourly
-      api.get("/laeq-hourly", { params: queryParams }),
+      api.get("/laeq-lmin-lmax", { params: queryParams }),
     ]);
 
     // Initialize map to store hourly data

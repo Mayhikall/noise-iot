@@ -466,7 +466,7 @@ const NoiseDashboard = () => {
       const timeInterval = setInterval(updateDateTime, 1000);
 
       // Update summary every 15 seconds
-      updateSummaryInterval = setInterval(fetchSummaryData, 15000);
+      updateSummaryInterval = setInterval(fetchSummaryData, 1000);
 
       // Update trend data every 30 seconds
       updateTrendInterval = setInterval(loadAllTrendData, 30000);
@@ -493,7 +493,7 @@ const NoiseDashboard = () => {
 
   // Update minute data every 5 minutes
   useEffect(() => {
-    const timer = setInterval(fetchMinuteData, 300000);
+    const timer = setInterval(fetchMinuteData, 60000);
     return () => clearInterval(timer);
   }, [fetchMinuteData]);
 
