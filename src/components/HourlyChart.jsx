@@ -71,28 +71,6 @@ const HourlyChart = ({ data }) => {
               </p>
             </div>
           ))}
-          {payload.length > 0 && payload[0].payload && (
-            <>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <p className="text-gray-200">
-                  <span>L-max: </span>
-                  <span className="text-white font-medium">
-                    {payload[0].payload.lmax?.toFixed(1) || 0} dB
-                  </span>
-                </p>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <p className="text-gray-200">
-                  <span>L-min: </span>
-                  <span className="text-white font-medium">
-                    {payload[0].payload.lmin?.toFixed(1) || 0} dB
-                  </span>
-                </p>
-              </div>
-            </>
-          )}
         </div>
       );
     }
@@ -121,7 +99,7 @@ const HourlyChart = ({ data }) => {
   return (
     <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
       <div className="p-4 border-b border-gray-700">
-        <h3 className="text-blue-300 text-sm font-medium">Tren LAeq Per Jam</h3>
+        <h3 className="text-blue-300 text-sm font-medium">Tren Lmin dan Lmax Per Jam</h3>
       </div>
       <div className="p-4 h-64">
         <ResponsiveContainer width="100%" height="100%">
@@ -151,12 +129,20 @@ const HourlyChart = ({ data }) => {
             />
             <Legend content={<CustomLegend />} />
             <Bar
-              dataKey="value"
-              fill="#10B981"
-              name="LAeq (Per Jam)"
+              dataKey="lmax"
+              fill="#EF4444"
+              name="Lmax"
               animationDuration={1000}
               radius={[2, 2, 0, 0]}
-              activeBar={{ fill: "#34D399", stroke: "#059669", strokeWidth: 2 }}
+              activeBar={{ fill: "#F87171", stroke: "#DC2626", strokeWidth: 2 }}
+            />
+            <Bar
+              dataKey="lmin"
+              fill="#3B82F6"
+              name="Lmin"
+              animationDuration={1000}
+              radius={[2, 2, 0, 0]}
+              activeBar={{ fill: "#60A5FA", stroke: "#2563EB", strokeWidth: 2 }}
             />
           </BarChart>
         </ResponsiveContainer>

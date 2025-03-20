@@ -499,7 +499,7 @@ const NoiseDashboard = () => {
 
   // Update hourly data every hour
   useEffect(() => {
-    const timer = setInterval(fetchHourlyData, 3600000);
+    const timer = setInterval(fetchHourlyData, 60000);
     return () => clearInterval(timer);
   }, [fetchHourlyData]);
 
@@ -605,8 +605,8 @@ const NoiseDashboard = () => {
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Data Laporan</h2>
-                <div className="flex space-x-2">
-                  {/* <select
+                {/* <div className="flex space-x-2">
+                  <select
                     value={reportTimeRange}
                     onChange={(e) =>
                       handleReportTimeRangeChange(e.target.value)
@@ -615,7 +615,7 @@ const NoiseDashboard = () => {
                   >
                     <option value="15minutes">15 Menit</option>
                     <option value="1hour">1 Jam</option>
-                  </select> */}
+                  </select>
                   <button
                     onClick={() => handleExportReport("excel")}
                     disabled={exportLoading || dataLoading.report}
@@ -632,7 +632,7 @@ const NoiseDashboard = () => {
                     <Download size={16} />
                     <span>PDF</span>
                   </button>
-                </div>
+                </div> */}
               </div>
               <ReportTable
                 reportData={reportData}
