@@ -250,7 +250,7 @@ export const fetchCombinedRealtimeData = async (params = {}) => {
       laeq: (laeqData.data || []).map((item) => ({
         created_at: item.created_at,
         dataType: "laeq",
-        laeq: item.laeq || 0,
+        laeq: item.value || 0,
       })),
 
       hourly: (hourlyData.data || []).map((item) => ({
@@ -355,7 +355,7 @@ export const fetchMqttStatus = async () => {
         const laeqResponse = await api.get("/laeq", {
           params: { limit: 1 },
         });
-        const laeqValue = laeqResponse.data?.[0]?.laeq || 0;
+        const laeqValue = laeqResponse.data?.[0]?.value || 0;
 
         // Logic to determine MQTT signal quality based on LAeq value
         if (laeqValue > 0 && laeqValue < 45) {
@@ -472,7 +472,7 @@ export const fetchTrendData = async (params = {}) => {
           const existingData = hourlyDataMap.get(timeKey);
           hourlyDataMap.set(timeKey, {
             ...existingData,
-            value: parseFloat(item.laeq) || 0,
+            value: parseFloat(item.value) || 0,
           });
         }
       });
