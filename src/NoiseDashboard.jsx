@@ -66,7 +66,7 @@ const NoiseDashboard = () => {
     status: "Offline",
     quality: "Offline",
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState({
     summary: false,
     trend: false,
@@ -499,7 +499,7 @@ const NoiseDashboard = () => {
 
   // Update hourly data every hour
   useEffect(() => {
-    const timer = setInterval(fetchHourlyData, 60000);
+    const timer = setInterval(fetchHourlyData, 3600000);
     return () => clearInterval(timer);
   }, [fetchHourlyData]);
 

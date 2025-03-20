@@ -5,7 +5,9 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 10000,
+  retry: 3,
+  retryDelay: 1000,
 });
 
 // Add response interceptor for better error handling
@@ -160,6 +162,7 @@ export const fetchLaeqHourlyData = async (params = {}) => {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      value: item.laeq1h || 0,
       lmax: item.Lmax || 0,
       lmin: item.Lmin || 0,
       created_at: item.created_at,
@@ -410,36 +413,85 @@ export const fetchTrendData = async (params = {}) => {
 
     // Fetch all required data in parallel
     const [laeqResponse, realtimeResponse, hourlyResponse] = await Promise.all([
-      // Fetch LAeq from tbl_laeq (hourly aggregated)
-      api.get("/laeq", { params: queryParams }),
+      // Fetch LAeq from tbl_laeq (minute data)
+      api.get("/laeq", { params: { ...queryParams, interval: "minute" } }),
 
-      // Fetch L10, L50, L90 from laeq_realtime (hourly aggregated)
+      // Fetch L10, L50, L90 from laeq_realtime (hourly data)
       api.get("/laeq-metrics", { params: queryParams }),
 
-      // Fetch Lmin, Lmax from laeq_hourly
+      // Fetch Lmin, Lmax from laeq_hourly (hourly data)
       api.get("/laeq-lmin-lmax", { params: queryParams }),
     ]);
 
-    // Initialize map to store hourly data
-    const hourlyDataMap = new Map();
+    // Initialize map to store minute data
+    const minuteDataMap = new Map();
 
     // Determine which hours to include based on time filter
     const hoursToInclude = [];
 
     if (timeFilter === "daytime") {
-      // For daytime: 7am to 6pm (7, 8, 9, ..., 18)
+      // For daytime: 7am to 6:59pm (7, 8, 9, ..., 18)
       for (let i = startHour; i < endHour; i++) {
         hoursToInclude.push(i);
       }
     } else {
-      // For nighttime: 7pm to 6am (19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6)
+      // Untuk waktu malam: 19:00 sampai 06:59 (19, 20, 21, ..., 23, 0, 1, ..., 6)
+      // Jam malam dimulai dari 19:00 hingga 23:59
       for (let i = startHour; i < 24; i++) {
         hoursToInclude.push(i);
       }
+      // Lalu dilanjutkan dari 00:00 hingga 06:59
       for (let i = 0; i < endHour; i++) {
         hoursToInclude.push(i);
       }
     }
+
+    // Initialize with slots for each minute in our range
+    hoursToInclude.forEach((hour) => {
+      for (let minute = 0; minute < 60; minute++) {
+        const timeStr = `${hour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
+
+        minuteDataMap.set(timeStr, {
+          time: timeStr,
+          value: null, // LAeq
+          l10: null,
+          l50: null,
+          l90: null,
+          lmin: null,
+          lmax: null,
+          hour: hour,
+          minute: minute,
+        });
+      }
+    });
+
+    // Process LAeq data from tbl_laeq (minute data)
+    if (laeqResponse.data && Array.isArray(laeqResponse.data)) {
+      laeqResponse.data.forEach((item) => {
+        if (!item || !item.created_at) return;
+
+        const date = new Date(item.created_at);
+        const hour = date.getHours();
+        const minute = date.getMinutes();
+        const timeKey = `${hour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
+
+        // Check if this minute is in our target range
+        if (minuteDataMap.has(timeKey)) {
+          const existingData = minuteDataMap.get(timeKey);
+          minuteDataMap.set(timeKey, {
+            ...existingData,
+            value: parseFloat(item.value) || 0,
+          });
+        }
+      });
+    }
+
+    // Initialize map to store hourly data for L10, L50, L90, Lmin, and Lmax
+    const hourlyDataMap = new Map();
 
     // Initialize with slots for each hour in our range
     hoursToInclude.forEach((hour) => {
@@ -447,7 +499,6 @@ export const fetchTrendData = async (params = {}) => {
 
       hourlyDataMap.set(timeStr, {
         time: timeStr,
-        value: null, // LAeq
         l10: null,
         l50: null,
         l90: null,
@@ -457,27 +508,7 @@ export const fetchTrendData = async (params = {}) => {
       });
     });
 
-    // Process LAeq data from tbl_laeq
-    if (laeqResponse.data && Array.isArray(laeqResponse.data)) {
-      laeqResponse.data.forEach((item) => {
-        if (!item || !item.created_at) return;
-
-        const date = new Date(item.created_at);
-        const hour = date.getHours();
-        const timeKey = `${hour.toString().padStart(2, "0")}:00`;
-
-        // Check if this hour is in our target range
-        if (hourlyDataMap.has(timeKey)) {
-          const existingData = hourlyDataMap.get(timeKey);
-          hourlyDataMap.set(timeKey, {
-            ...existingData,
-            value: parseFloat(item.value) || 0,
-          });
-        }
-      });
-    }
-
-    // Process L10, L50, L90 data from laeq_realtime
+    // Process L10, L50, L90 data from laeq_realtime (hourly data)
     if (realtimeResponse.data && Array.isArray(realtimeResponse.data)) {
       realtimeResponse.data.forEach((item) => {
         if (!item || !item.created_at) return;
@@ -499,7 +530,7 @@ export const fetchTrendData = async (params = {}) => {
       });
     }
 
-    // Process Lmin, Lmax from laeq_hourly
+    // Process Lmin, Lmax from laeq_hourly (hourly data)
     if (hourlyResponse.data && Array.isArray(hourlyResponse.data)) {
       hourlyResponse.data.forEach((item) => {
         if (!item || !item.created_at) return;
@@ -520,20 +551,44 @@ export const fetchTrendData = async (params = {}) => {
       });
     }
 
-    // Convert map to array and sort by hour in the correct sequence
-    let resultArray = Array.from(hourlyDataMap.values());
+    // Merge minute data with hourly data for L10, L50, L90, Lmin, and Lmax
+    minuteDataMap.forEach((minuteData, timeKey) => {
+      const hourKey = `${minuteData.hour.toString().padStart(2, "0")}:00`;
+      if (hourlyDataMap.has(hourKey)) {
+        const hourlyData = hourlyDataMap.get(hourKey);
+        minuteData.l10 = hourlyData.l10;
+        minuteData.l50 = hourlyData.l50;
+        minuteData.l90 = hourlyData.l90;
+        minuteData.lmin = hourlyData.lmin;
+        minuteData.lmax = hourlyData.lmax;
+      }
+    });
 
-    // For daytime, sort from 7:00 to 18:00
-    if (timeFilter === "daytime") {
-      resultArray.sort((a, b) => a.hour - b.hour);
-    }
-    // For nighttime, sort from 19:00 to 06:00
-    else {
+    // Convert map to array and sort by time in the correct sequence
+    let resultArray = Array.from(minuteDataMap.values());
+
+    // Sort by hour and minute untuk menampilkan dengan urutan yang benar
+    if (timeFilter === "nighttime") {
+      // Untuk nighttime, kita perlu mengurutkan dengan benar:
+      // 19:00, 20:00, 21:00, ..., 23:59, 00:00, 01:00, ..., 06:59
       resultArray.sort((a, b) => {
-        // This handles the wrap-around at midnight (19, 20, 21..., 0, 1, 2...)
-        const hourA = a.hour < startHour ? a.hour + 24 : a.hour;
-        const hourB = b.hour < startHour ? b.hour + 24 : b.hour;
-        return hourA - hourB;
+        // Konversi jam untuk perbandingan yang benar
+        const adjustedHourA = a.hour < 19 ? a.hour + 24 : a.hour;
+        const adjustedHourB = b.hour < 19 ? b.hour + 24 : b.hour;
+
+        if (adjustedHourA !== adjustedHourB) {
+          return adjustedHourA - adjustedHourB;
+        }
+
+        // Jika jam sama, urutkan berdasarkan menit
+        return a.minute - b.minute;
+      });
+    } else {
+      // Untuk daytime, urutkan normal
+      resultArray.sort((a, b) => {
+        const timeA = a.hour * 60 + a.minute;
+        const timeB = b.hour * 60 + b.minute;
+        return timeA - timeB;
       });
     }
 
