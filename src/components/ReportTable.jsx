@@ -160,30 +160,30 @@ const ReportTable = ({
   };
 
   // Render action buttons for the report with working refresh button
-  const renderActions = () => (
-    <div className="flex justify-end mb-4 gap-2">
-      <button
-        onClick={() => {
-          if (onRefresh && typeof onRefresh === "function") {
-            onRefresh();
-          }
-        }}
-        className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
-      >
-        <RefreshCw size={16} className="mr-2" />
-        Refresh Data
-      </button>
-      {onExport && (
-        <button
-          onClick={onExport}
-          className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all text-sm"
-        >
-          <Download size={16} className="mr-2" />
-          Export Data
-        </button>
-      )}
-    </div>
-  );
+  // const renderActions = () => (
+  //   <div className="flex justify-end mb-4 gap-2">
+  //     <button
+  //       onClick={() => {
+  //         if (onRefresh && typeof onRefresh === "function") {
+  //           onRefresh();
+  //         }
+  //       }}
+  //       className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
+  //     >
+  //       <RefreshCw size={16} className="mr-2" />
+  //       Refresh Data
+  //     </button>
+  //     {onExport && (
+  //       <button
+  //         onClick={onExport}
+  //         className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all text-sm"
+  //       >
+  //         <Download size={16} className="mr-2" />
+  //         Export Data
+  //       </button>
+  //     )}
+  //   </div>
+  // );
 
   // Improved pagination controls
   const renderPagination = () => {
@@ -708,7 +708,7 @@ const ReportTable = ({
   return (
     <div className="p-4">
       {renderDateTime()}
-      {renderActions()}
+      {/* {renderActions()} */}
       {renderTabNavigation()}
 
       {/* Render tables based on active tab */}

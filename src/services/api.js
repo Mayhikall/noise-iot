@@ -5,7 +5,7 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // Add response interceptor for better error handling
@@ -160,7 +160,6 @@ export const fetchLaeqHourlyData = async (params = {}) => {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      value: item.laeq1h || 0,
       lmax: item.Lmax || 0,
       lmin: item.Lmin || 0,
       created_at: item.created_at,
