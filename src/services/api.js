@@ -154,7 +154,7 @@ export const fetchLaeqMinuteData = async (params = {}) => {
 export const fetchLaeqHourlyData = async (params = {}) => {
   try {
     // Fetch from laeq_hourly for Hourly LAeq
-    const response = await api.get("/laeq-lmin-lmax", { params });
+    const response = await api.get("/laeq-hourly", { params });
 
     // Map the data to the format expected by the component
     const formattedData = response.data.map((item) => ({
@@ -163,8 +163,6 @@ export const fetchLaeqHourlyData = async (params = {}) => {
         minute: "2-digit",
       }),
       value: item.laeq1h || 0,
-      lmax: item.Lmax || 0,
-      lmin: item.Lmin || 0,
       created_at: item.created_at,
     }));
 
