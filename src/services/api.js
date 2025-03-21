@@ -162,7 +162,7 @@ export const fetchLaeqHourlyData = async (params = {}) => {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      value: item.laeq1h || 0,
+      value: item.laeq || 0, // Pastikan ini sesuai dengan kolom yang diambil dari database
       created_at: item.created_at,
     }));
 

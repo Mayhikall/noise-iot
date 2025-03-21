@@ -304,6 +304,7 @@ const NoiseDashboard = () => {
       setDataLoading((prev) => ({ ...prev, hourly: false }));
     }
   }, []);
+  
 
   // Fetch report data
   const fetchReportData = useCallback(async () => {

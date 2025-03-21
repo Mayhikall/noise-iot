@@ -10,7 +10,7 @@ import {
   Legend,
 } from "recharts";
 
-const HourlyChart = ({ data }) => {
+const HourlyChart = ({ data, isLoading }) => {
   // Sort data based on actual time (created_at)
   const sortedData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -137,7 +137,7 @@ const HourlyChart = ({ data }) => {
             <Bar
               dataKey="value"
               fill="#86efac"
-              name="LAeq"
+              name="LAeq (Per Jam)"
               animationDuration={1000}
               radius={[2, 2, 0, 0]}
               activeBar={{ fill: "#a7f3bd", stroke: "#86efac", strokeWidth: 2 }}
