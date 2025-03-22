@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   BarChart2,
   TrendingDown,
@@ -6,10 +6,17 @@ import {
   AlertCircle,
   Calendar,
   Volume2,
-  Menu
-} from 'lucide-react';
+  Menu,
+} from "lucide-react";
+import logo from "../assets/logo.png";
 
-const SidebarItem = ({ icon: Icon, label, isActive = false, isSidebarOpen, onClick }) => {
+const SidebarItem = ({
+  icon: Icon,
+  label,
+  isActive = false,
+  isSidebarOpen,
+  onClick,
+}) => {
   return (
     <a
       href="#"
@@ -19,51 +26,53 @@ const SidebarItem = ({ icon: Icon, label, isActive = false, isSidebarOpen, onCli
       }}
       className={`
         flex items-center 
-        ${isSidebarOpen ? 'px-4 py-3 rounded-r-full' : 'justify-center py-3'}
-        ${isActive 
-          ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white' 
-          : 'text-gray-400 hover:bg-gray-700 hover:text-white'}
-        ${isSidebarOpen ? 'mt-1' : ''}
+        ${isSidebarOpen ? "px-4 py-3 rounded-r-full" : "justify-center py-3"}
+        ${
+          isActive
+            ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white"
+            : "text-gray-400 hover:bg-gray-700 hover:text-white"
+        }
+        ${isSidebarOpen ? "mt-1" : ""}
       `}
     >
-      <Icon size={18} className={isSidebarOpen ? 'mr-3' : ''} />
+      <Icon size={18} className={isSidebarOpen ? "mr-3" : ""} />
       {isSidebarOpen && <span>{label}</span>}
     </a>
   );
 };
 
-const Sidebar = ({ 
-  isSidebarOpen, 
-  toggleSidebar, 
-  activeSection = 'dashboard',
-  onSectionChange 
+const Sidebar = ({
+  isSidebarOpen,
+  toggleSidebar,
+  activeSection = "dashboard",
+  onSectionChange,
 }) => {
   const sidebarItems = [
-    { 
-      icon: BarChart2, 
-      label: 'Dashboard', 
-      key: 'dashboard' 
+    {
+      icon: BarChart2,
+      label: "Dashboard",
+      key: "dashboard",
     },
-    { 
-      icon: TrendingDown, 
-      label: 'Tren', 
-      key: 'trend' 
+    {
+      icon: TrendingDown,
+      label: "Tren",
+      key: "trend",
     },
-    { 
-      icon: MapPin, 
-      label: 'Lokasi', 
-      key: 'location' 
+    {
+      icon: MapPin,
+      label: "Lokasi",
+      key: "location",
     },
-    { 
-      icon: AlertCircle, 
-      label: 'Peringatan', 
-      key: 'alerts' 
+    {
+      icon: AlertCircle,
+      label: "Peringatan",
+      key: "alerts",
     },
-    { 
-      icon: Calendar, 
-      label: 'Laporan', 
-      key: 'reports' 
-    }
+    {
+      icon: Calendar,
+      label: "Laporan",
+      key: "reports",
+    },
   ];
 
   return (
@@ -75,10 +84,10 @@ const Sidebar = ({
       <div className="p-4 flex items-center justify-between">
         {isSidebarOpen && (
           <div className="flex items-center">
-            <div className="h-8 w-8 bg-gradient-to-br from-green-400 to-blue-500 rounded-md flex items-center justify-center">
-              <Volume2 size={18} className="text-white" />
+            <div className="h-10 w-24 bg-white flex items-center justify-center">
+              <img src={logo} alt="Logo" className="h-18 w-18" />
+              {/* Sesuaikan ukuran sesuai kebutuhan */}
             </div>
-            <span className="ml-2 font-bold text-white">OtoSense</span>
           </div>
         )}
         <button
@@ -91,7 +100,7 @@ const Sidebar = ({
 
       <div className="mt-6">
         <nav>
-          {sidebarItems.map(item => (
+          {sidebarItems.map((item) => (
             <SidebarItem
               key={item.key}
               icon={item.icon}
