@@ -7,6 +7,7 @@ import {
   TrendingDown,
   ArrowDownUp,
   Download,
+  FileText,
   RefreshCw,
 } from "lucide-react";
 
@@ -16,6 +17,8 @@ const ReportTable = ({
   fetchMoreData,
   onRefresh,
   onExport,
+  timeRange,
+  isLoading,
 }) => {
   // Separate pagination state for each tab
   const [paginationState, setPaginationState] = useState({
@@ -25,7 +28,6 @@ const ReportTable = ({
     extremes: { currentPage: 1, itemsPerPage: 10 },
   });
   const [activeTab, setActiveTab] = useState("all");
-
   // Filter data based on type
   const filteredData = useMemo(() => {
     return {
@@ -94,6 +96,12 @@ const ReportTable = ({
     }
   }, [activeTab, reportData]);
 
+  const handleExport = (format) => {
+    if (onExport && typeof onExport === "function") {
+      onExport(format, activeTab);
+    }
+  };
+
   // Helper function to format date - using the timestamp from each data item
   const getBulanIndonesia = (month) => {
     const bulan = [
@@ -160,30 +168,26 @@ const ReportTable = ({
   };
 
   // Render action buttons for the report with working refresh button
-  // const renderActions = () => (
-  //   <div className="flex justify-end mb-4 gap-2">
-  //     <button
-  //       onClick={() => {
-  //         if (onRefresh && typeof onRefresh === "function") {
-  //           onRefresh();
-  //         }
-  //       }}
-  //       className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
-  //     >
-  //       <RefreshCw size={16} className="mr-2" />
-  //       Refresh Data
-  //     </button>
-  //     {onExport && (
-  //       <button
-  //         onClick={onExport}
-  //         className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all text-sm"
-  //       >
-  //         <Download size={16} className="mr-2" />
-  //         Export Data
-  //       </button>
-  //     )}
-  //   </div>
-  // );
+  const renderActions = () => (
+    <div className="flex justify-end mb-4 gap-2">
+      <button
+        onClick={() => handleExport("excel")}
+        disabled={isLoading}
+        className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Download size={16} className="mr-2" />
+        Export Excel
+      </button>
+      <button
+        onClick={() => handleExport("pdf")}
+        disabled={isLoading}
+        className="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <FileText size={16} className="mr-2" />
+        Export PDF
+      </button>
+    </div>
+  );
 
   // Improved pagination controls
   const renderPagination = () => {
@@ -582,7 +586,7 @@ const ReportTable = ({
 
   // Tab navigation component
   const renderTabNavigation = () => (
-    <div className="flex space-x-1 bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl p-1 mb-4 border border-gray-700">
+    <div className="flex space-x-1 bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl p-1 mb-2 border border-gray-700">
       <button
         onClick={() => setActiveTab("all")}
         className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all 
@@ -708,7 +712,7 @@ const ReportTable = ({
   return (
     <div className="p-4">
       {renderDateTime()}
-      {/* {renderActions()} */}
+      {renderActions()}
       {renderTabNavigation()}
 
       {/* Render tables based on active tab */}

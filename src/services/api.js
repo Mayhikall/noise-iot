@@ -608,25 +608,49 @@ export const fetchTrendData = async (params = {}) => {
   }
 };
 
-export const exportReportData = async (format, timeRange, params = {}) => {
+// Updated export function in the services/api.js file
+export const exportReportData = async (
+  format,
+  reportType,
+  timeRange = "15minutes"
+) => {
   try {
-    const endpoint = format === "excel" ? "/export-excel" : "/export-pdf";
+    const endpoint = "/api/export/export";
 
-    const response = await api.get(endpoint, {
-      params: {
-        ...params,
-        timeRange, // 15minutes or 1hour
-      },
-      responseType: format === "excel" ? "blob" : "blob",
-    });
+    const response = await fetch(
+      `${endpoint}?reportType=${reportType}&format=${format}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Export failed with status: ${response.status}`);
+    }
+
+    const blob = await response.blob();
 
     // Create a download link
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
+
+    // Generate meaningful filename based on report type with current date
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const reportTypeLabel =
+      ({
+        all: "all_reports",
+        laeq: "laeq_report",
+        percentiles: "percentiles_report",
+        extremes: "extremes_report",
+      }[reportType] || "noise_report") + `_${currentDate}`;
+
     link.setAttribute(
       "download",
-      `noise_report.${format === "excel" ? "xlsx" : "pdf"}`
+      `${reportTypeLabel}.${format === "excel" ? "xlsx" : "pdf"}`
     );
     document.body.appendChild(link);
     link.click();

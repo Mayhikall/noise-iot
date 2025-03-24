@@ -4,44 +4,74 @@ import SecondaryCard from "./SecondaryCard";
 const SecondaryCardsRow = ({ currentLMin, currentLMax, currentStatus }) => {
   // Determine status and colors for LMin based on value
   const getLMinStatus = (value) => {
-    if (value < 35)
+    // Berdasarkan standar WHO dan standar kebisingan lingkungan umum untuk Lmin
+    if (value < 30) {
       return {
-        status: "Rendah",
+        status: "Sangat Rendah",
         bgColor: "bg-green-500/20",
         textColor: "text-green-400",
       };
-    if (value < 45)
+    } else if (value < 40) {
+      return {
+        status: "Rendah",
+        bgColor: "bg-green-300/20",
+        textColor: "text-green-500",
+      };
+    } else if (value < 50) {
       return {
         status: "Sedang",
         bgColor: "bg-yellow-500/20",
         textColor: "text-yellow-400",
       };
-    return {
-      status: "Tinggi",
-      bgColor: "bg-red-500/20",
-      textColor: "text-red-400",
-    };
+    } else if (value < 60) {
+      return {
+        status: "Tinggi",
+        bgColor: "bg-orange-500/20",
+        textColor: "text-orange-400",
+      };
+    } else {
+      return {
+        status: "Sangat Tinggi",
+        bgColor: "bg-red-500/20",
+        textColor: "text-red-400",
+      };
+    }
   };
 
   // Determine status and colors for LMax based on value
   const getLMaxStatus = (value) => {
-    if (value < 55)
+    // Berdasarkan standar WHO, ISO dan standar kebisingan lingkungan umum untuk Lmax
+    if (value < 50) {
       return {
-        status: "Rendah",
+        status: "Sangat Rendah",
         bgColor: "bg-green-500/20",
         textColor: "text-green-400",
       };
-    if (value < 65)
+    } else if (value < 65) {
+      return {
+        status: "Rendah",
+        bgColor: "bg-green-300/20",
+        textColor: "text-green-500",
+      };
+    } else if (value < 75) {
       return {
         status: "Sedang",
         bgColor: "bg-yellow-500/20",
         textColor: "text-yellow-400",
       };
-    return {
-      status: "Tinggi",
-      bgColor: "bg-red-500/20",
-      textColor: "text-red-400",
-    };
+    } else if (value < 85) {
+      return {
+        status: "Tinggi",
+        bgColor: "bg-orange-500/20",
+        textColor: "text-orange-400",
+      };
+    } else {
+      return {
+        status: "Sangat Tinggi",
+        bgColor: "bg-red-500/20",
+        textColor: "text-red-400",
+      };
+    }
   };
 
   // Get dynamic status for LMin and LMax

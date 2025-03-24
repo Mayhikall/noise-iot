@@ -44,6 +44,7 @@ const Laporan = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [timeFilter, setTimeFilter] = useState("daytime");
   const [activeSidebarSection, setActiveSidebarSection] = useState("laporan");
+  const [activeReportTab, setActiveReportTab] = useState("all");
   const [reportTimeRange, setReportTimeRange] = useState("15minutes");
   const [exportLoading, setExportLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -304,7 +305,6 @@ const Laporan = () => {
       setDataLoading((prev) => ({ ...prev, hourly: false }));
     }
   }, []);
-  
 
   // Fetch report data
   const fetchReportData = useCallback(async () => {
@@ -397,10 +397,11 @@ const Laporan = () => {
 
   // Handle export report
   const handleExportReport = useCallback(
-    async (format) => {
+    async (format, reportType) => {
       try {
         setExportLoading(true);
-        await exportReportData(format, reportTimeRange);
+        // Use the reportType passed from ReportTable
+        await exportReportData(format, reportType, reportTimeRange);
         setExportLoading(false);
       } catch (err) {
         console.error(`Error exporting ${format} report:`, err);
@@ -412,8 +413,8 @@ const Laporan = () => {
   );
 
   // Handle report time range change
-  const handleReportTimeRangeChange = useCallback((range) => {
-    setReportTimeRange(range);
+  const handleReportTabChange = useCallback((tab) => {
+    setActiveReportTab(tab);
   }, []);
 
   // Effect to monitor reportTimeRange changes
@@ -570,31 +571,15 @@ const Laporan = () => {
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Data Laporan</h2>
-                {/* <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleExportReport("excel")}
-                    disabled={exportLoading || dataLoading.report}
-                    className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText size={16} />
-                    <span>Excel</span>
-                  </button>
-                  <button
-                    onClick={() => handleExportReport("pdf")}
-                    disabled={exportLoading || dataLoading.report}
-                    className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Download size={16} />
-                    <span>PDF</span>
-                  </button>
-                </div> */}
               </div>
               <ReportTable
                 reportData={reportData}
                 currentDateTime={currentDateTime.toLocaleString("id-ID")}
                 timeRange={reportTimeRange}
                 fetchMoreData={fetchReportData}
-                isLoading={dataLoading.report}
+                onExport={handleExportReport}
+                onTabChange={handleReportTabChange}
+                isLoading={dataLoading.report || exportLoading}
               />
             </div>
           </div>
