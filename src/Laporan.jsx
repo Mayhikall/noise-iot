@@ -38,12 +38,12 @@ import {
   fetchCombinedRealtimeData,
 } from "./services/api";
 
-const NoiseDashboard = () => {
+const Laporan = () => {
   // State Management
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [timeFilter, setTimeFilter] = useState("daytime");
-  const [activeSidebarSection, setActiveSidebarSection] = useState("dashboard");
+  const [activeSidebarSection, setActiveSidebarSection] = useState("laporan");
   const [reportTimeRange, setReportTimeRange] = useState("15minutes");
   const [exportLoading, setExportLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -567,42 +567,36 @@ const NoiseDashboard = () => {
             isLoading={isAnyDataLoading}
           />
           <div className="p-6 flex-1">
-            <div className="lg:col-span-1 mb-6">
-              <MapPanel
-                currentStatus={currentStatus}
-                deviceId="EETSB"
-                mqttStatus={{ ...mqttStatus, ...mqttStatusDisplay }}
-              />
-            </div>
-            <div className="lg:col-span-3">
-              <SummaryCardsRow
-                currentLaeq={currentLaeq}
-                currentL10={currentL10}
-                currentL50={currentL50}
-                currentL90={currentL90}
-                currentStatus={currentStatus}
-              />
-              <div className="mt-6">
-                <SecondaryCardsRow
-                  currentLMin={currentLMin}
-                  currentLMax={currentLMax}
-                  currentStatus={currentStatus}
-                />
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Data Laporan</h2>
+                {/* <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleExportReport("excel")}
+                    disabled={exportLoading || dataLoading.report}
+                    className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText size={16} />
+                    <span>Excel</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportReport("pdf")}
+                    disabled={exportLoading || dataLoading.report}
+                    className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Download size={16} />
+                    <span>PDF</span>
+                  </button>
+                </div> */}
               </div>
-            </div>
-            {/* <div className="mb-6">
-              <TrendChart
-                data={currentTrendData}
-                timeFilter={timeFilter}
-                onTimeFilterChange={handleTimeFilterChange}
-                year={selectedYear}
-                month={selectedMonth}
-                day={selectedDay}
-                isLoading={dataLoading.trend}
+              <ReportTable
+                reportData={reportData}
+                currentDateTime={currentDateTime.toLocaleString("id-ID")}
+                timeRange={reportTimeRange}
+                fetchMoreData={fetchReportData}
+                isLoading={dataLoading.report}
               />
-              <MinuteChart data={minuteData} isLoading={dataLoading.minute} />
-              <HourlyChart data={hourlyData} isLoading={dataLoading.hourly} />
-            </div> */}
+            </div>
           </div>
           <Footer />
         </div>
@@ -611,4 +605,4 @@ const NoiseDashboard = () => {
   );
 };
 
-export default NoiseDashboard;
+export default Laporan;

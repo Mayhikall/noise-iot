@@ -38,12 +38,12 @@ import {
   fetchCombinedRealtimeData,
 } from "./services/api";
 
-const NoiseDashboard = () => {
+const TrenData = () => {
   // State Management
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [timeFilter, setTimeFilter] = useState("daytime");
-  const [activeSidebarSection, setActiveSidebarSection] = useState("dashboard");
+  const [activeSidebarSection, setActiveSidebarSection] = useState("tren");
   const [reportTimeRange, setReportTimeRange] = useState("15minutes");
   const [exportLoading, setExportLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -567,30 +567,9 @@ const NoiseDashboard = () => {
             isLoading={isAnyDataLoading}
           />
           <div className="p-6 flex-1">
-            <div className="lg:col-span-1 mb-6">
-              <MapPanel
-                currentStatus={currentStatus}
-                deviceId="EETSB"
-                mqttStatus={{ ...mqttStatus, ...mqttStatusDisplay }}
-              />
-            </div>
-            <div className="lg:col-span-3">
-              <SummaryCardsRow
-                currentLaeq={currentLaeq}
-                currentL10={currentL10}
-                currentL50={currentL50}
-                currentL90={currentL90}
-                currentStatus={currentStatus}
-              />
-              <div className="mt-6">
-                <SecondaryCardsRow
-                  currentLMin={currentLMin}
-                  currentLMax={currentLMax}
-                  currentStatus={currentStatus}
-                />
-              </div>
-            </div>
-            {/* <div className="mb-6">
+           
+            
+            <div className="mb-6">
               <TrendChart
                 data={currentTrendData}
                 timeFilter={timeFilter}
@@ -602,7 +581,7 @@ const NoiseDashboard = () => {
               />
               <MinuteChart data={minuteData} isLoading={dataLoading.minute} />
               <HourlyChart data={hourlyData} isLoading={dataLoading.hourly} />
-            </div> */}
+            </div>
           </div>
           <Footer />
         </div>
@@ -611,4 +590,4 @@ const NoiseDashboard = () => {
   );
 };
 
-export default NoiseDashboard;
+export default TrenData;

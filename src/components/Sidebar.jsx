@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart2,
   TrendingDown,
@@ -7,6 +8,7 @@ import {
   Calendar,
   Volume2,
   Menu,
+  TrendingUp,
 } from "lucide-react";
 import logo from "../assets/logo.png";
 
@@ -47,18 +49,34 @@ const Sidebar = ({
   activeSection = "dashboard",
   onSectionChange,
 }) => {
+  const navigate = useNavigate();
+
   const sidebarItems = [
     {
       icon: BarChart2,
       label: "Dashboard",
       key: "dashboard",
+      path: "/",
+    },
+    {
+      icon: TrendingUp,
+      label: "Tren Data",
+      key: "tren",
+      path: "/tren-data",
     },
     {
       icon: Calendar,
       label: "Laporan",
-      key: "reports",
+      key: "laporan",
+      path: "/laporan",
     },
+    
   ];
+
+  const handleNavigation = (path) => {
+    navigate(path);
+    onSectionChange(path === "/" ? "dashboard" : "laporan");
+  };
 
   return (
     <div
@@ -91,7 +109,7 @@ const Sidebar = ({
               label={item.label}
               isActive={activeSection === item.key}
               isSidebarOpen={isSidebarOpen}
-              onClick={() => onSectionChange(item.key)}
+              onClick={() => handleNavigation(item.path)}
             />
           ))}
         </nav>
