@@ -54,21 +54,6 @@ const Sidebar = ({
       key: "dashboard",
     },
     {
-      icon: TrendingDown,
-      label: "Tren",
-      key: "trend",
-    },
-    {
-      icon: MapPin,
-      label: "Lokasi",
-      key: "location",
-    },
-    {
-      icon: AlertCircle,
-      label: "Peringatan",
-      key: "alerts",
-    },
-    {
       icon: Calendar,
       label: "Laporan",
       key: "reports",
@@ -84,9 +69,8 @@ const Sidebar = ({
       <div className="p-4 flex items-center justify-between">
         {isSidebarOpen && (
           <div className="flex items-center">
-            <div className="h-10 w-24 bg-white flex items-center justify-center">
-              <img src={logo} alt="Logo" className="h-18 w-18" />
-              {/* Sesuaikan ukuran sesuai kebutuhan */}
+            <div className="h-10 w-32 bg-white flex items-center justify-center rounded-lg shadow-sm">
+              <img src={logo} alt="Logo" className="h-8 w-25 object-contain" />
             </div>
           </div>
         )}

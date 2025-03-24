@@ -607,16 +607,6 @@ const NoiseDashboard = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Data Laporan</h2>
                 {/* <div className="flex space-x-2">
-                  <select
-                    value={reportTimeRange}
-                    onChange={(e) =>
-                      handleReportTimeRangeChange(e.target.value)
-                    }
-                    className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1"
-                  >
-                    <option value="15minutes">15 Menit</option>
-                    <option value="1hour">1 Jam</option>
-                  </select>
                   <button
                     onClick={() => handleExportReport("excel")}
                     disabled={exportLoading || dataLoading.report}
