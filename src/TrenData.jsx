@@ -281,7 +281,7 @@ const TrenData = () => {
   const fetchMinuteData = useCallback(async () => {
     try {
       setDataLoading((prev) => ({ ...prev, minute: true }));
-      const response = await fetchLaeqMinuteData();
+      const response = await fetchLaeqMinuteData({ limit: 60 });
       setMinuteData(response);
       console.log("Minute data loaded");
     } catch (err) {

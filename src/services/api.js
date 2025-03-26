@@ -119,7 +119,6 @@ export const fetchLaeqData = async (params = {}) => {
 export const fetchLaeqMinuteData = async (params = {}) => {
   try {
     // Fetch from laeq_data for Minute LAeq
-    // Ensure we request 60 data points (1 hour of minute data)
     const response = await api.get("/laeq-data", {
       params: {
         ...params,
@@ -129,17 +128,13 @@ export const fetchLaeqMinuteData = async (params = {}) => {
       },
     });
 
-    if (!response.data || !Array.isArray(response.data)) {
-      return [];
-    }
-
-    // Format the data for the chart
+    // Map the data to the format expected by the component
     const formattedData = response.data.map((item) => ({
       time: new Date(item.created_at).toLocaleTimeString("id-ID", {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      value: item.value || 0,
+      value: item.laeq || 0, // Changed from item.value to item.laeq
       created_at: item.created_at,
     }));
 
