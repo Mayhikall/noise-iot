@@ -1,9 +1,9 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import NoiseDashboard from './NoiseDashboard';
-import Laporan from './Laporan'; // Pastikan path import ini benar
-import './App.css';
-import TrenData from './TrenData';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import NoiseDashboard from "./NoiseDashboard";
+import TrenData from "./TrenData";
+import Laporan from "./Laporan"; // Pastikan path import ini benar
+import "./App.css";
 
 function App() {
   return (
@@ -11,8 +11,8 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/" element={<NoiseDashboard />} />
-          <Route path="/laporan" element={<Laporan />} />
           <Route path="/tren-data" element={<TrenData />} />
+          <Route path="/laporan" element={<Laporan />} />
         </Routes>
       </div>
     </Router>

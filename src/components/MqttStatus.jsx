@@ -3,7 +3,10 @@ import { Wifi, WifiOff } from "lucide-react";
 import { fetchMqttStatus } from "../services/api";
 
 const MqttStatus = () => {
-  const [mqttStatus, setMqttStatus] = useState({ status: "Offline", quality: "Offline" });
+  const [mqttStatus, setMqttStatus] = useState({
+    status: "Offline",
+    quality: "Offline",
+  });
   const [loading, setLoading] = useState(true);
 
   // Fetch MQTT status on component mount and set up interval
@@ -36,13 +39,13 @@ const MqttStatus = () => {
       return {
         icon: WifiOff,
         color: "text-gray-500",
-        text: "Offline"
+        text: "Offline",
       };
     } else {
       return {
         icon: Wifi,
         color: "text-green-500",
-        text: "Online"
+        text: "Online",
       };
     }
   };
@@ -60,9 +63,7 @@ const MqttStatus = () => {
       ) : (
         <>
           <StatusIcon className={statusDisplay.color} size={18} />
-          <span className={statusDisplay.color}>
-            {statusDisplay.text}
-          </span>
+          <span className={statusDisplay.color}>{statusDisplay.text}</span>
         </>
       )}
     </div>

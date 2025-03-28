@@ -38,6 +38,19 @@ import {
   fetchCombinedRealtimeData,
 } from "./services/api";
 
+// Snowflake component for the animation
+const Snowflake = () => {
+  const style = {
+    left: `${Math.random() * 100}vw`,
+    animationDuration: `${Math.random() * 3 + 2}s`,
+    animationDelay: `${Math.random() * 5}s`,
+    opacity: Math.random(),
+    transform: `scale(${Math.random()})`,
+  };
+
+  return <div className="snowflake" style={style} />;
+};
+
 const NoiseDashboard = () => {
   // State Management
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -49,6 +62,7 @@ const NoiseDashboard = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+  const [snowflakes, setSnowflakes] = useState([]);
 
   // Data States
   const [summaryData, setSummaryData] = useState({
@@ -77,6 +91,19 @@ const NoiseDashboard = () => {
   });
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Initialize snowflakes
+  useEffect(() => {
+    const flakes = Array.from({ length: 50 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      duration: Math.random() * 3 + 2,
+      delay: Math.random() * 5,
+      opacity: Math.random(),
+      size: Math.random(),
+    }));
+    setSnowflakes(flakes);
+  }, []);
 
   // Sidebar Toggle Function
   const toggleSidebar = useCallback(() => {
@@ -304,7 +331,6 @@ const NoiseDashboard = () => {
       setDataLoading((prev) => ({ ...prev, hourly: false }));
     }
   }, []);
-  
 
   // Fetch report data
   const fetchReportData = useCallback(async () => {
@@ -541,7 +567,7 @@ const NoiseDashboard = () => {
           <p className="text-xl mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
           >
             Refresh Dashboard
           </button>
@@ -551,8 +577,26 @@ const NoiseDashboard = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden relative">
+      {/* Snow animation */}
+      <div className="snow-container fixed inset-0 pointer-events-none z-10">
+        {snowflakes.map((flake) => (
+          <div
+            key={flake.id}
+            className="snowflake absolute text-white opacity-80"
+            style={{
+              left: `${flake.left}%`,
+              animation: `fall ${flake.duration}s linear ${flake.delay}s infinite`,
+              fontSize: `${flake.size * 10 + 10}px`,
+              opacity: flake.opacity,
+            }}
+          >
+            ❄
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-1 overflow-hidden relative z-20">
         <Sidebar
           isSidebarOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar}
@@ -607,6 +651,20 @@ const NoiseDashboard = () => {
           <Footer />
         </div>
       </div>
+      {/* Add global styles for the snow animation */}
+      <style jsx global>{`
+        @keyframes fall {
+          0% {
+            transform: translateY(-10vh) rotate(0deg);
+          }
+          100% {
+            transform: translateY(110vh) rotate(360deg);
+          }
+        }
+        .snowflake {
+          will-change: transform;
+        }
+      `}</style>
     </div>
   );
 };

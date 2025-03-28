@@ -14,11 +14,11 @@ const MinuteChart = ({ data }) => {
   // Determine dynamic domain based on actual data values
   const getYDomain = () => {
     if (!data || data.length === 0) return [35, 50];
-    
+
     const values = data.map((item) => item.value);
     const minValue = Math.floor(Math.min(...values, 35));
     const maxValue = Math.ceil(Math.max(...values, 50));
-    
+
     return [Math.max(0, minValue - 5), maxValue + 5];
   };
 
@@ -35,7 +35,10 @@ const MinuteChart = ({ data }) => {
                 style={{ backgroundColor: entry.color }}
               ></div>
               <p className="text-gray-200">
-                {entry.name}: <span className="text-white font-medium">{entry.value.toFixed(1)} dB</span>
+                {entry.name}:{" "}
+                <span className="text-white font-medium">
+                  {entry.value.toFixed(1)} dB
+                </span>
               </p>
             </div>
           ))}
@@ -58,7 +61,7 @@ const MinuteChart = ({ data }) => {
   // Custom legend component
   const CustomLegend = (props) => {
     const { payload } = props;
-    
+
     return (
       <div className="flex justify-center items-center mt-2 mb-1">
         {payload.map((entry, index) => (
@@ -77,7 +80,9 @@ const MinuteChart = ({ data }) => {
   return (
     <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
       <div className="p-4 border-b border-gray-700">
-        <h3 className="text-blue-300 text-sm font-medium">Tren LAeq Per Menit</h3>
+        <h3 className="text-blue-300 text-sm font-medium">
+          Tren LAeq Per Menit
+        </h3>
       </div>
       <div className="p-4 h-64">
         <ResponsiveContainer width="100%" height="100%">
@@ -87,7 +92,11 @@ const MinuteChart = ({ data }) => {
             barGap={0}
             barCategoryGap="20%"
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#374151"
+              opacity={0.5}
+            />
             <XAxis
               dataKey="time"
               stroke="#9CA3AF"
@@ -101,8 +110,8 @@ const MinuteChart = ({ data }) => {
               tick={{ fontSize: 10, fill: "#9CA3AF" }}
               tickFormatter={(value) => `${value} dB`}
             />
-            <Tooltip 
-              content={<CustomTooltip />} 
+            <Tooltip
+              content={<CustomTooltip />}
               cursor={{ opacity: 0.3, fill: "#4B5563" }}
               wrapperStyle={{ outline: "none" }}
             />

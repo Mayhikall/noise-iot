@@ -9,7 +9,102 @@ import {
   Download,
   FileText,
   RefreshCw,
+  Loader2,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
+
+const ExportModal = ({ status, onClose, format }) => {
+  const getStatusDetails = () => {
+    switch (status) {
+      case "loading":
+        return {
+          icon: <Loader2 className="animate-spin h-12 w-12 text-blue-500" />,
+          title: "Preparing Export",
+          message: `Generating ${format.toUpperCase()} file, please wait...`,
+          color: "text-blue-500",
+        };
+      case "success":
+        return {
+          icon: <CheckCircle className="h-12 w-12 text-green-500" />,
+          title: "Export Successful",
+          message: `Your ${format.toUpperCase()} file is ready to download!`,
+          color: "text-green-500",
+        };
+      case "error":
+        return {
+          icon: <XCircle className="h-12 w-12 text-red-500" />,
+          title: "Export Failed",
+          message: "Sorry, something went wrong. Please try again.",
+          color: "text-red-500",
+        };
+      default:
+        return {
+          icon: null,
+          title: "",
+          message: "",
+          color: "",
+        };
+    }
+  };
+
+  const statusDetails = getStatusDetails();
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-xl shadow-2xl border border-gray-700 w-full max-w-md transform transition-all duration-300 scale-95 animate-fadeIn">
+        <div className="p-6">
+          <div className="flex flex-col items-center justify-center mb-4">
+            <div className="mb-4">{statusDetails.icon}</div>
+            <h3 className={`text-xl font-bold mb-2 ${statusDetails.color}`}>
+              {statusDetails.title}
+            </h3>
+            <p className="text-gray-300 text-center">{statusDetails.message}</p>
+          </div>
+
+          {status === "success" && (
+            <div className="mt-6 bg-gray-700 rounded-lg p-4 border border-gray-600">
+              <div className="flex items-center justify-center">
+                {format === "excel" ? (
+                  <>
+                    <FileText className="h-6 w-6 text-green-400 mr-2" />
+                    <span className="text-green-400 font-medium">
+                      report_data.xlsx
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-6 w-6 text-red-400 mr-2" />
+                    <span className="text-red-400 font-medium">
+                      report_data.pdf
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="text-xs text-gray-400 text-center mt-2">
+                {new Date().toLocaleString()}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={onClose}
+              className={`px-6 py-2 rounded-lg font-medium ${
+                status === "loading"
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              } transition-colors`}
+              disabled={status === "loading"}
+            >
+              {status === "loading" ? "Processing..." : "Close"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ReportTable = ({
   reportData,
@@ -28,6 +123,12 @@ const ReportTable = ({
     extremes: { currentPage: 1, itemsPerPage: 10 },
   });
   const [activeTab, setActiveTab] = useState("all");
+  const [exportStatus, setExportStatus] = useState({
+    show: false,
+    status: "idle", // 'idle', 'loading', 'success', 'error'
+    format: null,
+  });
+
   // Filter data based on type
   const filteredData = useMemo(() => {
     return {
@@ -37,6 +138,48 @@ const ReportTable = ({
       extremes: reportData.filter((item) => item.dataType === "hourly"),
     };
   }, [reportData]);
+
+  // Handle export
+  const handleExport = async (format) => {
+    setExportStatus({
+      show: true,
+      status: "loading",
+      format,
+    });
+
+    try {
+      if (onExport && typeof onExport === "function") {
+        await onExport(format, activeTab);
+        setExportStatus((prev) => ({
+          ...prev,
+          status: "success",
+        }));
+
+        // Auto-close after 3 seconds
+        setTimeout(() => {
+          setExportStatus({
+            show: false,
+            status: "idle",
+            format: null,
+          });
+        }, 3000);
+      }
+    } catch (error) {
+      setExportStatus((prev) => ({
+        ...prev,
+        status: "error",
+      }));
+    }
+  };
+
+  // Close modal
+  const closeExportModal = () => {
+    setExportStatus({
+      show: false,
+      status: "idle",
+      format: null,
+    });
+  };
 
   // Get current pagination settings based on active tab
   const getCurrentPagination = () => {
@@ -95,12 +238,6 @@ const ReportTable = ({
       updatePagination(activeTab, { currentPage: 1 });
     }
   }, [activeTab, reportData]);
-
-  const handleExport = (format) => {
-    if (onExport && typeof onExport === "function") {
-      onExport(format, activeTab);
-    }
-  };
 
   // Helper function to format date - using the timestamp from each data item
   const getBulanIndonesia = (month) => {
@@ -172,18 +309,35 @@ const ReportTable = ({
     <div className="flex justify-end mb-4 gap-2">
       <button
         onClick={() => handleExport("excel")}
-        disabled={isLoading}
-        className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isLoading || exportStatus.status === "loading"}
+        className={`flex items-center px-3 py-2 rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+          exportStatus.status === "loading" && exportStatus.format === "excel"
+            ? "bg-green-700 text-white"
+            : "bg-green-600 hover:bg-green-700 text-white"
+        }`}
       >
-        <Download size={16} className="mr-2" />
+        {exportStatus.status === "loading" &&
+        exportStatus.format === "excel" ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Download size={16} className="mr-2" />
+        )}
         Export Excel
       </button>
       <button
         onClick={() => handleExport("pdf")}
-        disabled={isLoading}
-        className="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isLoading || exportStatus.status === "loading"}
+        className={`flex items-center px-3 py-2 rounded-lg transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+          exportStatus.status === "loading" && exportStatus.format === "pdf"
+            ? "bg-red-700 text-white"
+            : "bg-red-600 hover:bg-red-700 text-white"
+        }`}
       >
-        <FileText size={16} className="mr-2" />
+        {exportStatus.status === "loading" && exportStatus.format === "pdf" ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <FileText size={16} className="mr-2" />
+        )}
         Export PDF
       </button>
     </div>
@@ -724,6 +878,15 @@ const ReportTable = ({
 
       {/* Items per page selector */}
       {renderItemsPerPageSelector()}
+
+      {/* Export Modal */}
+      {exportStatus.show && (
+        <ExportModal
+          status={exportStatus.status}
+          onClose={closeExportModal}
+          format={exportStatus.format}
+        />
+      )}
     </div>
   );
 };

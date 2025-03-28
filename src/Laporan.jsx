@@ -14,6 +14,9 @@ import {
   WifiOff,
   Download,
   FileText,
+  CloudRain,
+  Cloud,
+  Droplets,
 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import ReportTable from "./components/ReportTable";
@@ -38,6 +41,48 @@ import {
   fetchCombinedRealtimeData,
 } from "./services/api";
 
+// RainDrop component for animation
+const RainDrop = ({ intensity }) => {
+  const left = `${Math.random() * 100}%`;
+  const animationDuration = `${
+    0.5 + Math.random() * (intensity === "heavy" ? 0.3 : 0.7)
+  }s`;
+  const delay = `${Math.random() * 0.5}s`;
+  const size =
+    intensity === "heavy"
+      ? `${2 + Math.random() * 2}px`
+      : `${1 + Math.random() * 1}px`;
+  const opacity = intensity === "heavy" ? 0.8 : 0.6;
+
+  return (
+    <div
+      className="absolute bg-blue-300 rounded-full pointer-events-none"
+      style={{
+        left,
+        width: size,
+        height: size,
+        opacity,
+        top: "-10px",
+        animation: `fall ${animationDuration} linear infinite`,
+        animationDelay: delay,
+      }}
+    />
+  );
+};
+
+// RainAnimation component
+const RainAnimation = ({ intensity = "light", count = 50 }) => {
+  const drops = Array.from({ length: count }).map((_, i) => (
+    <RainDrop key={i} intensity={intensity} />
+  ));
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {drops}
+    </div>
+  );
+};
+
 const Laporan = () => {
   // State Management
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -50,6 +95,7 @@ const Laporan = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+  const [weatherIntensity, setWeatherIntensity] = useState("light"); // 'light', 'medium', 'heavy'
 
   // Data States
   const [summaryData, setSummaryData] = useState({
@@ -233,6 +279,16 @@ const Laporan = () => {
       setDataLoading((prev) => ({ ...prev, summary: true }));
       const summary = await fetchDashboardSummary();
       setSummaryData(summary);
+
+      // Change weather intensity based on noise level
+      if (summary.latestLaeq.laeq > 70) {
+        setWeatherIntensity("heavy");
+      } else if (summary.latestLaeq.laeq > 50) {
+        setWeatherIntensity("medium");
+      } else {
+        setWeatherIntensity("light");
+      }
+
       console.log("Summary data loaded:", summary);
     } catch (err) {
       console.error("Error loading summary data:", err);
@@ -536,13 +592,13 @@ const Laporan = () => {
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-blue-900 text-white">
-        <div className="text-center p-8 bg-gray-800 rounded-lg">
+        <div className="text-center p-8 bg-gray-800 rounded-lg relative z-10">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
           <h2 className="text-2xl font-bold mb-2">Error</h2>
           <p className="text-xl mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
           >
             Refresh Dashboard
           </button>
@@ -552,8 +608,37 @@ const Laporan = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden relative">
+      {/* Rain Animation */}
+      <RainAnimation
+        intensity={weatherIntensity}
+        count={
+          weatherIntensity === "heavy"
+            ? 100
+            : weatherIntensity === "medium"
+            ? 60
+            : 30
+        }
+      />
+      {/* Global styles for animations */}
+      <style jsx global>{`
+        @keyframes fall {
+          to {
+            transform: translateY(100vh);
+          }
+        }
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateX(0) translateY(0);
+          }
+          50% {
+            transform: translateX(20px) translateY(-5px);
+          }
+        }
+      `}</style>
+
+      <div className="flex flex-1 overflow-hidden relative z-10">
         <Sidebar
           isSidebarOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar}

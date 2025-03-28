@@ -70,7 +70,6 @@ const Sidebar = ({
       key: "laporan",
       path: "/laporan",
     },
-    
   ];
 
   const handleNavigation = (path) => {

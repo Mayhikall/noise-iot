@@ -38,6 +38,26 @@ import {
   fetchCombinedRealtimeData,
 } from "./services/api";
 
+// Snowflake component for the animation
+const Snowflake = ({ id, left, duration, delay, opacity, size }) => {
+  return (
+    <div
+      className="snowflake absolute text-white pointer-events-none"
+      style={{
+        left: `${left}%`,
+        animation: `snowFall ${duration}s linear ${delay}s infinite`,
+        fontSize: `${size * 10 + 10}px`,
+        opacity: opacity,
+        zIndex: 10,
+        top: "-10px",
+        willChange: "transform",
+      }}
+    >
+      ❄
+    </div>
+  );
+};
+
 const TrenData = () => {
   // State Management
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -49,6 +69,7 @@ const TrenData = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+  const [snowflakes, setSnowflakes] = useState([]);
 
   // Data States
   const [summaryData, setSummaryData] = useState({
@@ -77,6 +98,19 @@ const TrenData = () => {
   });
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Initialize snowflakes
+  useEffect(() => {
+    const flakes = Array.from({ length: 50 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      duration: Math.random() * 3 + 2,
+      delay: Math.random() * 5,
+      opacity: Math.random(),
+      size: Math.random(),
+    }));
+    setSnowflakes(flakes);
+  }, []);
 
   // Sidebar Toggle Function
   const toggleSidebar = useCallback(() => {
@@ -304,7 +338,6 @@ const TrenData = () => {
       setDataLoading((prev) => ({ ...prev, hourly: false }));
     }
   }, []);
-  
 
   // Fetch report data
   const fetchReportData = useCallback(async () => {
@@ -541,7 +574,7 @@ const TrenData = () => {
           <p className="text-xl mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
           >
             Refresh Dashboard
           </button>
@@ -551,8 +584,38 @@ const TrenData = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden relative">
+      {/* Snow animation - Pindah ke sini dan gunakan komponen Snowflake */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {snowflakes.map((flake) => (
+          <Snowflake
+            key={flake.id}
+            left={flake.left}
+            duration={flake.duration}
+            delay={flake.delay}
+            opacity={flake.opacity}
+            size={flake.size}
+          />
+        ))}
+      </div>
+
+      {/* Global styles untuk animasi salju */}
+      <style jsx global>{`
+        @keyframes snowFall {
+          0% {
+            transform: translateY(-10vh) rotate(0deg);
+          }
+          100% {
+            transform: translateY(110vh) rotate(360deg);
+          }
+        }
+        .snowflake {
+          will-change: transform;
+          user-select: none;
+        }
+      `}</style>
+
+      <div className="flex flex-1 overflow-hidden relative z-10">
         <Sidebar
           isSidebarOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar}
@@ -567,8 +630,6 @@ const TrenData = () => {
             isLoading={isAnyDataLoading}
           />
           <div className="p-6 flex-1">
-           
-            
             <div className="mb-6">
               <TrendChart
                 data={currentTrendData}
