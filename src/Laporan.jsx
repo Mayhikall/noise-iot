@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Clock,
   MapPin,
@@ -17,6 +23,8 @@ import {
   CloudRain,
   Cloud,
   Droplets,
+  Volume,
+  VolumeX,
 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import ReportTable from "./components/ReportTable";
@@ -41,45 +49,77 @@ import {
   fetchCombinedRealtimeData,
 } from "./services/api";
 
-// RainDrop component for animation
-const RainDrop = ({ intensity }) => {
+// Enhanced RainDrop component with more variations
+const RainDrop = ({ intensity, index }) => {
   const left = `${Math.random() * 100}%`;
-  const animationDuration = `${
-    0.5 + Math.random() * (intensity === "heavy" ? 0.3 : 0.7)
-  }s`;
+  const animationDuration = `${0.3 + Math.random() * 0.7}s`;
   const delay = `${Math.random() * 0.5}s`;
-  const size =
-    intensity === "heavy"
-      ? `${2 + Math.random() * 2}px`
-      : `${1 + Math.random() * 1}px`;
-  const opacity = intensity === "heavy" ? 0.8 : 0.6;
+  const opacity =
+    intensity === "heavy" ? 0.9 : intensity === "medium" ? 0.7 : 0.5;
+
+  // Different sizes based on intensity
+  let size;
+  if (intensity === "heavy") {
+    size = `${2 + Math.random() * 3}px`;
+  } else if (intensity === "medium") {
+    size = `${1.5 + Math.random() * 2}px`;
+  } else {
+    size = `${1 + Math.random() * 1.5}px`;
+  }
+
+  // Add some variation to the animation
+  const animationName = `fall-${index % 3}`;
+  const animationStyle = {
+    left,
+    width: size,
+    height: size,
+    opacity,
+    top: "-20px",
+    animation: `${animationName} ${animationDuration} linear infinite`,
+    animationDelay: delay,
+  };
+
+  // Add slight horizontal movement for some drops
+  if (index % 5 === 0) {
+    animationStyle.transform = `translateX(${Math.random() * 20 - 10}px)`;
+  }
 
   return (
     <div
       className="absolute bg-blue-300 rounded-full pointer-events-none"
-      style={{
-        left,
-        width: size,
-        height: size,
-        opacity,
-        top: "-10px",
-        animation: `fall ${animationDuration} linear infinite`,
-        animationDelay: delay,
-      }}
+      style={animationStyle}
     />
   );
 };
 
-// RainAnimation component
-const RainAnimation = ({ intensity = "light", count = 50 }) => {
-  const drops = Array.from({ length: count }).map((_, i) => (
-    <RainDrop key={i} intensity={intensity} />
-  ));
+// Enhanced RainAnimation component with more control
+const RainAnimation = ({ intensity = "heavy", count = 120 }) => {
+  // Adjust count based on intensity
+  const dropCount =
+    intensity === "heavy" ? 200 : intensity === "medium" ? 120 : 60;
+
+  // Create different animation styles
+  const animationStyles = `
+    @keyframes fall-0 {
+      to { transform: translateY(100vh) translateX(0); }
+    }
+    @keyframes fall-1 {
+      to { transform: translateY(100vh) translateX(10px); }
+    }
+    @keyframes fall-2 {
+      to { transform: translateY(100vh) translateX(-10px); }
+    }
+  `;
 
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {drops}
-    </div>
+    <>
+      <style>{animationStyles}</style>
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {Array.from({ length: dropCount }).map((_, i) => (
+          <RainDrop key={i} intensity={intensity} index={i} />
+        ))}
+      </div>
+    </>
   );
 };
 
@@ -95,7 +135,13 @@ const Laporan = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
-  const [weatherIntensity, setWeatherIntensity] = useState("light"); // 'light', 'medium', 'heavy'
+  const [weatherIntensity, setWeatherIntensity] = useState("heavy"); // Default to heavy rain
+
+  // Audio state
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [volume, setVolume] = useState(0.5);
+  const [isMusicLoaded, setIsMusicLoaded] = useState(false);
+  const audioRef = useRef(null);
 
   // Data States
   const [summaryData, setSummaryData] = useState({
@@ -124,6 +170,104 @@ const Laporan = () => {
   });
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Initialize audio
+  useEffect(() => {
+    // Create audio element
+    audioRef.current = new Audio("src/assets/gala-gala.mp3"); // Update with your music file path
+    audioRef.current.loop = true;
+    audioRef.current.volume = volume;
+
+    // Handle when music is loaded
+    audioRef.current.addEventListener("canplaythrough", () => {
+      setIsMusicLoaded(true);
+    });
+
+    // Handle errors
+    audioRef.current.addEventListener("error", () => {
+      console.error("Error loading audio file");
+      setIsMusicLoaded(false);
+    });
+
+    // Auto-play handling
+    const handleFirstInteraction = () => {
+      // On first user interaction, try to play music if not already playing
+      if (!isMusicPlaying && isMusicLoaded) {
+        toggleMusic();
+      }
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
+    };
+
+    // Add event listeners for first interaction
+    document.addEventListener("click", handleFirstInteraction);
+    document.addEventListener("keydown", handleFirstInteraction);
+
+    return () => {
+      // Cleanup
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeEventListener("canplaythrough", () => {});
+        audioRef.current.removeEventListener("error", () => {});
+        audioRef.current = null;
+      }
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
+    };
+  }, [isMusicLoaded]);
+
+  // Handle volume changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Toggle music play/pause
+  const toggleMusic = useCallback(() => {
+    if (!audioRef.current || !isMusicLoaded) return;
+
+    if (isMusicPlaying) {
+      audioRef.current.pause();
+      setIsMusicPlaying(false);
+    } else {
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsMusicPlaying(true);
+        })
+        .catch((error) => {
+          console.error("Audio playback failed:", error);
+          // Show a message to user if needed
+        });
+    }
+  }, [isMusicPlaying, isMusicLoaded]);
+
+  // Handle volume change
+  const handleVolumeChange = useCallback(
+    (e) => {
+      const newVolume = parseFloat(e.target.value);
+      setVolume(newVolume);
+
+      // If volume is set to 0 and music is playing, pause it
+      if (newVolume === 0 && isMusicPlaying) {
+        audioRef.current.pause();
+        setIsMusicPlaying(false);
+      }
+      // If volume is > 0 and music is not playing, play it
+      else if (newVolume > 0 && !isMusicPlaying && isMusicLoaded) {
+        audioRef.current
+          .play()
+          .then(() => {
+            setIsMusicPlaying(true);
+          })
+          .catch((error) => {
+            console.error("Audio playback failed:", error);
+          });
+      }
+    },
+    [isMusicPlaying, isMusicLoaded]
+  );
 
   // Sidebar Toggle Function
   const toggleSidebar = useCallback(() => {
@@ -609,22 +753,32 @@ const Laporan = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden relative">
-      {/* Rain Animation */}
+      {/* Enhanced Rain Animation */}
       <RainAnimation
         intensity={weatherIntensity}
         count={
           weatherIntensity === "heavy"
-            ? 100
+            ? 200
             : weatherIntensity === "medium"
-            ? 60
-            : 30
+            ? 120
+            : 60
         }
       />
       {/* Global styles for animations */}
       <style jsx global>{`
-        @keyframes fall {
+        @keyframes fall-0 {
           to {
-            transform: translateY(100vh);
+            transform: translateY(100vh) translateX(0);
+          }
+        }
+        @keyframes fall-1 {
+          to {
+            transform: translateY(100vh) translateX(10px);
+          }
+        }
+        @keyframes fall-2 {
+          to {
+            transform: translateY(100vh) translateX(-10px);
           }
         }
         @keyframes float {
@@ -666,6 +820,36 @@ const Laporan = () => {
                 onTabChange={handleReportTabChange}
                 isLoading={dataLoading.report || exportLoading}
               />
+            </div>
+
+            {/* Music Controls with tighter spacing */}
+            <div className="sticky float-right bottom-4 z-50">
+              <div className="bg-gray-800 bg-opacity-70 p-2 rounded-lg flex items-center space-x-2 shadow-lg backdrop-blur-sm">
+                <button
+                  onClick={toggleMusic}
+                  className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+                  aria-label={isMusicPlaying ? "Pause music" : "Play music"}
+                >
+                  {isMusicPlaying ? (
+                    <Volume size={20} className="text-blue-400" />
+                  ) : (
+                    <VolumeX size={20} className="text-gray-400" />
+                  )}
+                </button>
+
+                {isMusicPlaying && (
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={volume}
+                    onChange={handleVolumeChange}
+                    className="w-24 accent-blue-500"
+                    aria-label="Volume control"
+                  />
+                )}
+              </div>
             </div>
           </div>
           <Footer />

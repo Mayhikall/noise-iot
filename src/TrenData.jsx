@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Clock,
   MapPin,
@@ -14,6 +20,8 @@ import {
   WifiOff,
   Download,
   FileText,
+  Volume,
+  VolumeX,
 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import ReportTable from "./components/ReportTable";
@@ -71,6 +79,12 @@ const TrenData = () => {
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [snowflakes, setSnowflakes] = useState([]);
 
+  // Audio state
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [volume, setVolume] = useState(0.5);
+  const [isMusicLoaded, setIsMusicLoaded] = useState(false);
+  const audioRef = useRef(null);
+
   // Data States
   const [summaryData, setSummaryData] = useState({
     latestLaeq: { laeq: 0, L10: 0, L50: 0, L90: 0, Lmax: 0, Lmin: 0 },
@@ -111,6 +125,104 @@ const TrenData = () => {
     }));
     setSnowflakes(flakes);
   }, []);
+
+  // Initialize audio
+  useEffect(() => {
+    // Create audio element
+    audioRef.current = new Audio("src/assets/success-swoop.mp3"); // Update with your music file path
+    audioRef.current.loop = true;
+    audioRef.current.volume = volume;
+
+    // Handle when music is loaded
+    audioRef.current.addEventListener("canplaythrough", () => {
+      setIsMusicLoaded(true);
+    });
+
+    // Handle errors
+    audioRef.current.addEventListener("error", () => {
+      console.error("Error loading audio file");
+      setIsMusicLoaded(false);
+    });
+
+    // Auto-play handling
+    const handleFirstInteraction = () => {
+      // On first user interaction, try to play music if not already playing
+      if (!isMusicPlaying && isMusicLoaded) {
+        toggleMusic();
+      }
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
+    };
+
+    // Add event listeners for first interaction
+    document.addEventListener("click", handleFirstInteraction);
+    document.addEventListener("keydown", handleFirstInteraction);
+
+    return () => {
+      // Cleanup
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeEventListener("canplaythrough", () => {});
+        audioRef.current.removeEventListener("error", () => {});
+        audioRef.current = null;
+      }
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
+    };
+  }, [isMusicLoaded]);
+
+  // Handle volume changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Toggle music play/pause
+  const toggleMusic = useCallback(() => {
+    if (!audioRef.current || !isMusicLoaded) return;
+
+    if (isMusicPlaying) {
+      audioRef.current.pause();
+      setIsMusicPlaying(false);
+    } else {
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsMusicPlaying(true);
+        })
+        .catch((error) => {
+          console.error("Audio playback failed:", error);
+          // Show a message to user if needed
+        });
+    }
+  }, [isMusicPlaying, isMusicLoaded]);
+
+  // Handle volume change
+  const handleVolumeChange = useCallback(
+    (e) => {
+      const newVolume = parseFloat(e.target.value);
+      setVolume(newVolume);
+
+      // If volume is set to 0 and music is playing, pause it
+      if (newVolume === 0 && isMusicPlaying) {
+        audioRef.current.pause();
+        setIsMusicPlaying(false);
+      }
+      // If volume is > 0 and music is not playing, play it
+      else if (newVolume > 0 && !isMusicPlaying && isMusicLoaded) {
+        audioRef.current
+          .play()
+          .then(() => {
+            setIsMusicPlaying(true);
+          })
+          .catch((error) => {
+            console.error("Audio playback failed:", error);
+          });
+      }
+    },
+    [isMusicPlaying, isMusicLoaded]
+  );
 
   // Sidebar Toggle Function
   const toggleSidebar = useCallback(() => {
@@ -585,7 +697,7 @@ const TrenData = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 text-white overflow-hidden relative">
-      {/* Snow animation - Pindah ke sini dan gunakan komponen Snowflake */}
+      {/* Snow animation */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         {snowflakes.map((flake) => (
           <Snowflake
@@ -599,7 +711,6 @@ const TrenData = () => {
         ))}
       </div>
 
-      {/* Global styles untuk animasi salju */}
       <style jsx global>{`
         @keyframes snowFall {
           0% {
@@ -630,7 +741,9 @@ const TrenData = () => {
             isLoading={isAnyDataLoading}
           />
           <div className="p-6 flex-1">
-            <div className="mb-6">
+            <div className="mb-2">
+              {" "}
+              {/* Reduced from mb-6 to mb-2 */}
               <TrendChart
                 data={currentTrendData}
                 timeFilter={timeFilter}
@@ -642,6 +755,35 @@ const TrenData = () => {
               />
               <MinuteChart data={minuteData} isLoading={dataLoading.minute} />
               <HourlyChart data={hourlyData} isLoading={dataLoading.hourly} />
+              {/* Music Controls with tighter spacing */}
+              <div className="sticky float-right bottom-4 z-50">
+                <div className="bg-gray-800 bg-opacity-70 p-2 rounded-lg flex items-center space-x-2 shadow-lg backdrop-blur-sm">
+                  <button
+                    onClick={toggleMusic}
+                    className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+                    aria-label={isMusicPlaying ? "Pause music" : "Play music"}
+                  >
+                    {isMusicPlaying ? (
+                      <Volume size={20} className="text-blue-400" />
+                    ) : (
+                      <VolumeX size={20} className="text-gray-400" />
+                    )}
+                  </button>
+
+                  {isMusicPlaying && (
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={volume}
+                      onChange={handleVolumeChange}
+                      className="w-24 accent-blue-500"
+                      aria-label="Volume control"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           <Footer />
